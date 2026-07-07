@@ -80,6 +80,7 @@ function poblarMotivosSalida() {
   const lista = (prod && !esDespacho(prod)) ? motivosSalida.filter(m => !m.transfiere) : motivosSalida;
   sel.innerHTML = lista.map(m => `<option value="${m.nombre}">${m.nombre}</option>`).join("");
   if (lista.some(m => m.nombre === actual)) sel.value = actual;
+  else if (lista.some(m => m.nombre === "Reposición")) sel.value = "Reposición";
 }
 
 
