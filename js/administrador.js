@@ -10,7 +10,7 @@ import { renderResumen, badgeProducto, calcularResumen, debeAvanzar } from "./co
 import { initConteo, abrirConteo, setProductosConteo } from "./conteo-fisico.js";
 import {
   collection, doc, addDoc, updateDoc, getDocs,
-  onSnapshot, query, orderBy, limit, serverTimestamp, writeBatch
+  onSnapshot, query, orderBy, limit, serverTimestamp, writeBatch, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 protegerRuta("Administrador");
@@ -215,7 +215,7 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click",async(
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
     await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo,cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"externo",destino:"acopio"});
-    await updateDoc(doc(db,"productos",prodId),{stock_deposito:(prod.stock_deposito??0)+cantidad});
+    await updateDoc(doc(db,"productos",prodId),{stock_deposito:increment(cantidad)});
     mostrarMsg(msgEl,"ok",`✓ ${cantidad} ${prod.unidad_medida} ingresados al acopio.`);
     document.getElementById("ent-cantidad").value="1"; cargarMovRecientes();
   }catch(err){mostrarMsg(msgEl,"error","Error: "+err.message);}
@@ -330,7 +330,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click",async()
     if(cantidad>stockSector){mostrarMsg(msgEl,"error",`Stock insuficiente en ${origen}. Hay ${stockSector} ${prod.unidad_medida}.`);return;}
     btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
     try{
-      await updateDoc(doc(db,"productos",prodId),{[`stock_despacho.${origen}`]:Math.max(0,stockSector-cantidad)});
+      await updateDoc(doc(db,"productos",prodId),{[`stock_despacho.${origen}`]:increment(-cantidad)});
       await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen,destino:"consumo"});
       mostrarMsg(msgEl,"ok",`✓ Retiro de ${cantidad} ${prod.unidad_medida} desde ${origen}.`);
       document.getElementById("sal-cantidad").value="1"; cargarMovRecientes();
@@ -352,10 +352,10 @@ document.getElementById("btn-confirmar-salida").addEventListener("click",async()
       else if(sects.length===1)destino=sects[0];
       else throw new Error("El producto no tiene sector de despacho asignado.");
       const batch=writeBatch(db);
-      batch.update(doc(db,"productos",prodId),{stock_deposito:Math.max(0,(prod.stock_deposito??0)-cantidad),[`stock_despacho.${destino}`]:((prod.stock_despacho?.[destino]??0)+cantidad)});
+      batch.update(doc(db,"productos",prodId),{stock_deposito:increment(-cantidad),[`stock_despacho.${destino}`]:increment(cantidad)});
       await batch.commit();
     }else{
-      await updateDoc(doc(db,"productos",prodId),{stock_deposito:Math.max(0,(prod.stock_deposito??0)-cantidad)});
+      await updateDoc(doc(db,"productos",prodId),{stock_deposito:increment(-cantidad)});
     }
     await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"acopio",destino});
     mostrarMsg(msgEl,"ok",destino!=="consumo"?`✓ Retiro de ${cantidad} ${prod.unidad_medida} → ${destino}.`:`✓ Retiro registrado (${motivo}).`);
@@ -409,7 +409,7 @@ document.getElementById("btn-confirmar-venta").addEventListener("click",async()=
   if(cantidad>stockSector){mostrarMsg(msgEl,"error",`Stock insuficiente en ${sector}. Hay ${stockSector} ${prod.unidad_medida}.`);return;}
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
-    await updateDoc(doc(db,"productos",prodId),{[`stock_despacho.${sector}`]:Math.max(0,stockSector-cantidad)});
+    await updateDoc(doc(db,"productos",prodId),{[`stock_despacho.${sector}`]:increment(-cantidad)});
     await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"VENTA",cantidad,unidad:prod.unidad_medida,motivo:obs||"Venta",origen:sector,destino:"salon",periodo_desde:desdeVal?new Date(desdeVal):null,periodo_hasta:fechaHasta});
     if(debeAvanzar(prod.ventas_hasta,fechaHasta)){
       await updateDoc(doc(db,"productos",prodId),{ventas_hasta:fechaHasta});
@@ -630,10 +630,19 @@ document.getElementById("btn-confirmar-editar-motivo").addEventListener("click",
   new Set([...Object.keys(oldEf.despacho),...Object.keys(newEf.despacho)]).forEach(s=>{
     despacho[s]=+((despacho[s]??0)+((newEf.despacho[s]||0)-(oldEf.despacho[s]||0))).toFixed(4);
   });
+  // Escrituras atómicas: aplicamos los deltas con increment (no pisa cambios
+  // concurrentes en otros sectores ni el valor real del acopio).
+  const prodUpdate={};
+  const dAcopio=newEf.acopio-oldEf.acopio;
+  if(dAcopio)prodUpdate.stock_deposito=increment(dAcopio);
+  new Set([...Object.keys(oldEf.despacho),...Object.keys(newEf.despacho)]).forEach(s=>{
+    const d=(newEf.despacho[s]||0)-(oldEf.despacho[s]||0);
+    if(d)prodUpdate[`stock_despacho.${s}`]=increment(d);
+  });
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
     const batch=writeBatch(db);
-    batch.update(doc(db,"productos",prod.id),{stock_deposito:nuevoAcopio,stock_despacho:despacho});
+    if(Object.keys(prodUpdate).length)batch.update(doc(db,"productos",prod.id),prodUpdate);
     batch.update(doc(db,"movimientos",m.id),{motivo:obs?`${nuevo} — ${obs}`:nuevo,destino:newDestino,corregido:true,motivo_anterior:m.motivo,fecha_correccion:serverTimestamp()});
     await batch.commit();
     prod.stock_deposito=nuevoAcopio;

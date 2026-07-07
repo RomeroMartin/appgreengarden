@@ -23,6 +23,10 @@ const esDespacho = (p) => p.tipo === "Despacho";
 const esReceta   = (p) => p.tipo === "Receta";
 const sectoresDe = (p) => p.sectores_asignados ?? [];
 
+// Escapa datos antes de inyectarlos por innerHTML (nombres/PLU/sector vienen
+// de la base o del Excel subido → evita XSS).
+const escHtml = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
 // ── Inicializar el importador (lo llama cada panel) ───────────
 export function initImportador({ productos, usuarioActual, onTerminado }) {
   _productos     = productos;
@@ -235,26 +239,26 @@ function construirPreview(items) {
       if (f.esReceta) {
         const sinSector = !f.sectorReceta;
         const sinIng    = !f.ingredientes.length;
-        const tag = f.variante ? ` <span style="font-size:0.62rem;background:var(--dorado,#c8a96e);color:#1c1c1a;padding:1px 6px;border-radius:5px;font-weight:700;">${f.variante}</span>` : "";
+        const tag = f.variante ? ` <span style="font-size:0.62rem;background:var(--dorado,#c8a96e);color:#1c1c1a;padding:1px 6px;border-radius:5px;font-weight:700;">${escHtml(f.variante)}</span>` : "";
         const ingHtml = f.ingredientes.map(ing => {
           const tieneIn = ing.cant_in != null && ing.unidad_in;
           const consumo = tieneIn
             ? `${+(ing.cant_in * f.cantidad).toFixed(3)} ${ing.unidad_in}`
             : `${+(ing.cantidad * f.cantidad).toFixed(3)} ${ing.unidad}`;
-          return `<div style="font-size:0.74rem;color:var(--texto-3);">• ${ing.nombre}: <strong style="color:var(--texto-2);">${consumo}</strong></div>`;
+          return `<div style="font-size:0.74rem;color:var(--texto-3);">• ${escHtml(ing.nombre)}: <strong style="color:var(--texto-2);">${consumo}</strong></div>`;
         }).join("");
         let aviso;
         if (f.noConfig) {
-          aviso = `<div style="font-size:0.72rem;color:var(--bajo-txt);">⚠️ variante "${f.tamanoExcel||"sin tamaño"}" no configurada en la receta — no se descuenta</div>`;
+          aviso = `<div style="font-size:0.72rem;color:var(--bajo-txt);">⚠️ variante "${escHtml(f.tamanoExcel||"sin tamaño")}" no configurada en la receta — no se descuenta</div>`;
         } else if (sinSector || sinIng) {
           aviso = `<div style="font-size:0.72rem;color:var(--bajo-txt);">⚠️ ${sinSector ? "sin sector asignado" : "sin ingredientes"} — no se descuenta</div>`;
         } else {
-          aviso = `<div style="font-size:0.72rem;color:var(--texto-3);margin-bottom:3px;">🍸 arma en ${f.sectorReceta}:</div>${ingHtml}`;
+          aviso = `<div style="font-size:0.72rem;color:var(--texto-3);margin-bottom:3px;">🍸 arma en ${escHtml(f.sectorReceta)}:</div>${ingHtml}`;
         }
         return `<div style="padding:10px 0;border-bottom:1px solid var(--borde);">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
             <div style="flex:1;min-width:0;">
-              <div style="font-size:0.88rem;font-weight:600;">🍸 ${f.prod.nombre}${tag} <span style="font-size:0.62rem;background:var(--bg-secondary);color:var(--texto-3);padding:1px 6px;border-radius:5px;">PLU ${f.prod.plu}</span></div>
+              <div style="font-size:0.88rem;font-weight:600;">🍸 ${escHtml(f.prod.nombre)}${tag} <span style="font-size:0.62rem;background:var(--bg-secondary);color:var(--texto-3);padding:1px 6px;border-radius:5px;">PLU ${escHtml(f.prod.plu)}</span></div>
               ${aviso}
             </div>
             <span style="font-size:0.95rem;font-weight:700;color:var(--verde);white-space:nowrap;">${f.cantidad} u.</span>
@@ -263,14 +267,14 @@ function construirPreview(items) {
       }
       const multi = f.sectores.length > 1;
       const selector = multi
-        ? `<select class="form-control import-sector-sel" data-idx="${idx}" style="font-size:0.8rem;padding:6px 8px;margin-top:4px;">${f.sectores.map(s=>`<option value="${s}">${s}</option>`).join("")}</select>`
+        ? `<select class="form-control import-sector-sel" data-idx="${idx}" style="font-size:0.8rem;padding:6px 8px;margin-top:4px;">${f.sectores.map(s=>`<option value="${escHtml(s)}">${escHtml(s)}</option>`).join("")}</select>`
         : (f.sectores.length === 1
-            ? `<span style="font-size:0.72rem;color:var(--texto-3);">→ ${f.sectores[0]}</span>`
+            ? `<span style="font-size:0.72rem;color:var(--texto-3);">→ ${escHtml(f.sectores[0])}</span>`
             : `<span style="font-size:0.72rem;color:var(--bajo-txt);">⚠️ sin sector de despacho</span>`);
       return `<div style="padding:10px 0;border-bottom:1px solid var(--borde);">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
           <div style="flex:1;min-width:0;">
-            <div style="font-size:0.88rem;font-weight:600;">${f.prod.nombre} <span style="font-size:0.62rem;background:var(--bg-secondary);color:var(--texto-3);padding:1px 6px;border-radius:5px;">PLU ${f.prod.plu}</span></div>
+            <div style="font-size:0.88rem;font-weight:600;">${escHtml(f.prod.nombre)} <span style="font-size:0.62rem;background:var(--bg-secondary);color:var(--texto-3);padding:1px 6px;border-radius:5px;">PLU ${escHtml(f.prod.plu)}</span></div>
             ${multi ? selector : `<div>${selector}</div>`}
           </div>
           <span style="font-size:0.95rem;font-weight:700;color:var(--verde);white-space:nowrap;">${f.cantidad} ${f.prod.unidad_medida||""}</span>
@@ -282,7 +286,7 @@ function construirPreview(items) {
   if (ignorados.length) {
     html += `<div style="margin-top:14px;padding-top:10px;border-top:2px solid var(--borde);">
       <p style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--texto-3);margin-bottom:8px;">Ignorados (sin PLU en la app)</p>
-      ${ignorados.map(i => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;color:var(--texto-3);"><span>${i.nombre} <span style="opacity:0.6;">· cód ${i.plu}</span></span><span>${i.cantidad}</span></div>`).join("")}
+      ${ignorados.map(i => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.78rem;color:var(--texto-3);"><span>${escHtml(i.nombre)} <span style="opacity:0.6;">· cód ${escHtml(i.plu)}</span></span><span>${escHtml(i.cantidad)}</span></div>`).join("")}
     </div>`;
   }
 

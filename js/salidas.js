@@ -7,7 +7,7 @@ import { auth, db } from "./firebase-config.js";
 import { protegerRuta, logout } from "./auth.js";
 import {
   collection, doc, addDoc, updateDoc, getDocs,
-  query, orderBy, limit, where, serverTimestamp, writeBatch
+  query, orderBy, limit, where, serverTimestamp, writeBatch, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 protegerRuta("Cargador Salidas");
@@ -176,7 +176,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click", async 
     if (cantidad > stockSector) { mostrarMsg(msgEl,"error",`Stock insuficiente en ${origen}. Hay ${fmtN(stockSector)} ${prod.unidad_medida}.`); return; }
     btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
     try {
-      await updateDoc(doc(db,"productos",prodId), { [`stock_despacho.${origen}`]: Math.max(0, stockSector - cantidad) });
+      await updateDoc(doc(db,"productos",prodId), { [`stock_despacho.${origen}`]: increment(-cantidad) });
       if(!prod.stock_despacho)prod.stock_despacho={};
       prod.stock_despacho[origen]=Math.max(0,stockSector-cantidad);
       await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen,destino:"consumo"});
@@ -207,14 +207,14 @@ document.getElementById("btn-confirmar-salida").addEventListener("click", async 
 
       const batch = writeBatch(db);
       batch.update(doc(db,"productos",prodId), {
-        stock_deposito: Math.max(0,(prod.stock_deposito??0)-cantidad),
-        [`stock_despacho.${destino}`]: ((prod.stock_despacho?.[destino]??0)+cantidad)
+        stock_deposito: increment(-cantidad),
+        [`stock_despacho.${destino}`]: increment(cantidad)
       });
       await batch.commit();
       if(!prod.stock_despacho)prod.stock_despacho={};
       prod.stock_despacho[destino]=(prod.stock_despacho[destino]??0)+cantidad;
     } else {
-      await updateDoc(doc(db,"productos",prodId),{stock_deposito:Math.max(0,(prod.stock_deposito??0)-cantidad)});
+      await updateDoc(doc(db,"productos",prodId),{stock_deposito:increment(-cantidad)});
     }
     prod.stock_deposito=Math.max(0,(prod.stock_deposito??0)-cantidad);
 
@@ -233,11 +233,12 @@ document.getElementById("btn-confirmar-salida").addEventListener("click", async 
 async function cargarHoy() {
   const cont = document.getElementById("lista-salidas-hoy");
   const hoy=new Date();hoy.setHours(0,0,0,0);
-  // Solo filtramos por usuario en Firestore (sin orderBy → no requiere índice compuesto).
-  // El orden y el filtro por fecha/tipo se hacen en el código.
-  const snap=await getDocs(query(collection(db,"movimientos"),where("id_usuario","==",auth.currentUser?.uid)));
+  // Filtramos por fecha (solo hoy) en Firestore → evita descargar todo el historial.
+  // Es un rango sobre un solo campo, no requiere índice compuesto. El orden y el
+  // filtro por usuario/tipo se hacen en el código.
+  const snap=await getDocs(query(collection(db,"movimientos"),where("fecha_hora",">=",hoy)));
   const retiros=snap.docs
-    .filter(d=>{const m=d.data();const ts=m.fecha_hora?.toDate?.();return ts&&ts>=hoy&&m.tipo==="RETIRO";})
+    .filter(d=>{const m=d.data();const ts=m.fecha_hora?.toDate?.();return ts&&ts>=hoy&&m.id_usuario===auth.currentUser?.uid&&m.tipo==="RETIRO";})
     .sort((a,b)=>(b.data().fecha_hora?.toDate?.()||0)-(a.data().fecha_hora?.toDate?.()||0));
   if(!retiros.length){cont.innerHTML='<div class="empty-state"><p>Sin retiros hoy.</p></div>';return;}
   cont.innerHTML=retiros.map(d=>{

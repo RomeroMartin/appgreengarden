@@ -7,7 +7,7 @@ import { auth, db } from "./firebase-config.js";
 import { protegerRuta, logout } from "./auth.js";
 import {
   collection, doc, addDoc, updateDoc, getDocs,
-  query, orderBy, limit, where, serverTimestamp
+  query, orderBy, limit, where, serverTimestamp, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 protegerRuta("Cargador Entradas");
@@ -84,7 +84,7 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click", async
       nombre_producto: prod.nombre, tipo, cantidad, unidad: prod.unidad_medida,
       motivo: obs ? `${motivo} — ${obs}` : motivo, origen: "externo", destino: "acopio"
     });
-    await updateDoc(doc(db,"productos",prodId), { stock_deposito: (prod.stock_deposito??0) + cantidad });
+    await updateDoc(doc(db,"productos",prodId), { stock_deposito: increment(cantidad) });
     prod.stock_deposito = (prod.stock_deposito??0) + cantidad;
     actualizarInfo();
     mostrarFlash();
@@ -99,14 +99,16 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click", async
 async function cargarEntradasHoy() {
   const cont = document.getElementById("lista-entradas-hoy");
   const hoy  = new Date(); hoy.setHours(0,0,0,0);
-  // Solo filtramos por usuario en Firestore (sin orderBy → no requiere índice compuesto).
+  // Filtramos por fecha (solo hoy) en Firestore → evita descargar todo el historial.
+  // Es un rango sobre un solo campo, no requiere índice compuesto. El filtro por
+  // usuario y tipo se hace en el código.
   const snap = await getDocs(query(collection(db,"movimientos"),
-    where("id_usuario","==",auth.currentUser?.uid)
+    where("fecha_hora",">=",hoy)
   ));
   const hoyMovs = snap.docs.filter(d => {
     const m = d.data();
     const ts = m.fecha_hora?.toDate?.();
-    return ts && ts >= hoy && (m.tipo === "INGRESO_PROVEEDOR" || m.tipo === "INGRESO_PRODUCCION");
+    return ts && ts >= hoy && m.id_usuario === auth.currentUser?.uid && (m.tipo === "INGRESO_PROVEEDOR" || m.tipo === "INGRESO_PRODUCCION");
   }).sort((a,b)=>(b.data().fecha_hora?.toDate?.()||0)-(a.data().fecha_hora?.toDate?.()||0));
   if (!hoyMovs.length) { cont.innerHTML='<div class="empty-state"><p>Sin entradas hoy.</p></div>'; return; }
   const labels = { INGRESO_PROVEEDOR:"↑ Proveedor", INGRESO_PRODUCCION:"↑ Producción" };

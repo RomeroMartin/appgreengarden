@@ -1,0 +1,81 @@
+rules_version = '2';
+// ============================================================
+// firestore.rules — Green Garden Inventario
+// Reglas que HACEN CUMPLIR los roles del lado del servidor.
+// Antes: cualquier usuario logueado podía escribir todo (incluido
+// auto-ascenderse a Gerente). Ahora cada rol solo hace lo suyo.
+//
+// ⚠️ BOOTSTRAP: el PRIMER Gerente hay que crearlo/marcarlo a mano
+//    en la consola de Firestore (usuarios/{uid} con rol:"Gerente",
+//    activo:true). Desde ahí, el Gerente crea al resto desde la app.
+// ============================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers de rol (leen el doc del propio usuario) ──────────
+    function datosUsuario() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+    function logueado() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && datosUsuario().activo == true;
+    }
+    function tieneRol(r) {
+      return logueado() && datosUsuario().rol == r;
+    }
+    function esGerente()     { return tieneRol('Gerente'); }
+    function gerenteOAdmin() { return esGerente() || tieneRol('Administrador'); }
+
+    // ¿La escritura sobre productos toca SOLO estas claves? (control de stock)
+    function soloAfecta(claves) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(claves);
+    }
+
+    // ── USUARIOS ─────────────────────────────────────────────────
+    // Cada uno lee su propio doc (lo necesita el login). El Gerente
+    // lee/administra a todos. NADIE puede editarse el rol a sí mismo.
+    match /usuarios/{userId} {
+      allow read:   if request.auth != null && (request.auth.uid == userId || esGerente());
+      allow create: if esGerente();
+      allow update: if esGerente();
+      allow delete: if esGerente();
+    }
+
+    // ── CATÁLOGO (solo lo configura el Gerente) ──────────────────
+    match /rubros/{id}            { allow read: if logueado(); allow write: if esGerente(); }
+    match /sectores/{id}          { allow read: if logueado(); allow write: if esGerente(); }
+    match /sectores_despacho/{id} { allow read: if logueado(); allow write: if esGerente(); }
+    match /motivos_salida/{id}    { allow read: if logueado(); allow write: if esGerente(); }
+
+    // ── PRODUCTOS ────────────────────────────────────────────────
+    // Leer: cualquier logueado. Crear/borrar/editar-catálogo: SOLO Gerente.
+    // Mover stock: el resto de roles puede tocar ÚNICAMENTE los campos de stock.
+    match /productos/{id} {
+      allow read:   if logueado();
+      allow create: if esGerente();
+      allow delete: if esGerente();
+      allow update: if esGerente()
+        // Admin puede además marcar la fecha de corte de ventas
+        || (gerenteOAdmin() && soloAfecta(['stock_deposito','stock_despacho','ventas_hasta']))
+        // Encargado / Cargadores: SOLO los dos baldes de stock, nada más
+        || (logueado()      && soloAfecta(['stock_deposito','stock_despacho']));
+    }
+
+    // ── MOVIMIENTOS ──────────────────────────────────────────────
+    // Todos los logueados crean (registran su operación) y leen.
+    // Editar un movimiento (corregir motivo) = Gerente o Admin.
+    // Borrar = solo Gerente.
+    match /movimientos/{id} {
+      allow read:   if logueado();
+      allow create: if logueado();
+      allow update: if gerenteOAdmin();
+      allow delete: if esGerente();
+    }
+
+    // ── Todo lo demás: denegado por defecto ──────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
