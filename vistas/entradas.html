@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#FAFAF7" />
+  <title>Green Garden — Entradas</title>
+  <link rel="stylesheet" href="../css/estilos.css" />
+  <style>
+    .cant-btn{background:var(--bg-secondary);border:none;color:var(--texto-2);font-size:1.3rem;width:50px;height:50px;cursor:pointer;font-weight:500;flex-shrink:0;}
+    .cant-btn:hover{background:var(--verde-suave);color:var(--verde);}
+    .cant-input{flex:1;border:none;outline:none;font-family:var(--font);font-size:1.3rem;font-weight:700;text-align:center;color:var(--texto);background:transparent;padding:0;}
+    .cantidad-control{display:flex;align-items:center;border:1.5px solid var(--borde);border-radius:var(--radio-input);overflow:hidden;transition:border-color 0.2s;}
+    .cantidad-control:focus-within{border-color:var(--borde-focus);box-shadow:0 0 0 3px rgba(115,154,99,0.12);}
+    .mov-mini{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--borde);gap:10px;}
+    .mov-mini:last-child{border-bottom:none;}
+    .success-flash{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);background:var(--normal-bg);border:1px solid #C3E0BF;color:var(--normal-txt);padding:12px 24px;border-radius:var(--radio);font-weight:600;font-size:0.9rem;box-shadow:var(--sombra-md);z-index:300;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);white-space:nowrap;}
+    .success-flash.show{transform:translateX(-50%) translateY(0);}
+  </style>
+</head>
+<body>
+  <div id="pantalla-carga"><div class="logo-loading"><div class="icon-loading">🌿</div>Green Garden</div><div class="spinner spinner-verde"></div></div>
+
+  <div class="app-wrapper" id="contenido" style="display:none;">
+    <header class="app-header">
+      <div class="app-logo"><div class="app-logo-icon">🌿</div>Green Garden</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="app-rol-badge" style="background:#E6F4E4;color:var(--normal-txt);border-color:#C3E0BF;">Entradas</span>
+        <button class="btn-logout" id="btn-logout">Salir</button>
+      </div>
+    </header>
+
+    <div style="margin-bottom:20px;">
+      <p style="font-size:1rem;font-weight:700;" id="saludo">Hola 👋</p>
+      <p style="font-size:0.8rem;color:var(--texto-3);">Registrá el ingreso de mercadería</p>
+    </div>
+
+    <div class="card">
+      <p class="card-title">↑ Registrar Entrada</p>
+      <div class="form-group"><label class="form-label">Tipo de entrada</label>
+        <select class="form-control" id="ent-tipo">
+          <option value="INGRESO_PROVEEDOR">Ingreso Proveedor</option>
+          <option value="INGRESO_PRODUCCION">Ingreso Producción</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Buscar producto</label><input class="form-control" type="search" id="ent-busqueda" placeholder="Escribí el nombre del producto..." /></div>
+      <div class="form-group"><label class="form-label">Producto</label><select class="form-control" id="ent-producto"></select></div>
+      <div id="producto-info" style="display:none;margin-bottom:14px;">
+        <div style="background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:10px 14px;display:flex;justify-content:space-between;">
+          <span style="font-size:0.82rem;color:var(--texto-2);">Stock en acopio</span>
+          <span style="font-size:1rem;font-weight:700;color:var(--verde);" id="stock-actual-display">—</span>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Cantidad <span id="ent-unidad" style="color:var(--verde);font-weight:600;"></span></label>
+        <div class="cantidad-control"><button class="cant-btn" id="ent-menos">−</button><input class="cant-input" type="number" id="ent-cantidad" value="1" min="0.1" step="0.1" /><button class="cant-btn" id="ent-mas">+</button></div>
+      </div>
+      <div class="form-group"><label class="form-label">Observaciones (opcional)</label><input class="form-control" type="text" id="ent-obs" placeholder="Ej: Proveedor La Serenísima" /></div>
+      <div id="msg-entrada" class="msg"></div>
+      <div class="mt-16"><button class="btn btn-primary" id="btn-confirmar-entrada">Registrar entrada</button></div>
+    </div>
+
+    <div class="card" style="padding:0 20px;">
+      <div style="padding:16px 0 12px;border-bottom:1px solid var(--borde);"><p class="card-title" style="margin:0;">Mis entradas de hoy</p></div>
+      <div id="lista-entradas-hoy"><div class="empty-state"><div class="spinner spinner-verde"></div></div></div>
+    </div>
+  </div>
+
+  <div class="success-flash" id="flash-ok">✓ Entrada registrada</div>
+  <div class="app-version"></div>
+  <script type="module" src="../js/version.js"></script>
+  <script type="module" src="../js/entradas.js"></script>
+</body>
+</html>

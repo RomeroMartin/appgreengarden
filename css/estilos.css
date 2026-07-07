@@ -1,0 +1,495 @@
+/* ============================================================
+   GREEN GARDEN — INVENTARIO
+   Design System v2 | Claro, minimalista, SaaS moderno
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ── Variables ─────────────────────────────────────────────── */
+:root {
+  --verde:        #739A63;
+  --verde-hover:  #648755;
+  --verde-suave:  #DCE8D6;
+  --verde-claro:  #F3F8F1;
+
+  --bg:           #FAFAF7;
+  --bg-card:      #FFFFFF;
+  --bg-secondary: #F5F4EF;
+  --bg-input:     #FFFFFF;
+
+  --borde:        #E8EBE6;
+  --borde-focus:  #739A63;
+
+  --texto:        #232A24;
+  --texto-2:      #4F5B51;
+  --texto-3:      #7D877F;
+
+  /* Estados de stock */
+  --normal-bg:    #E6F4E4;
+  --normal-txt:   #4F8A47;
+  --bajo-bg:      #FFF0D8;
+  --bajo-txt:     #D78A1E;
+  --critico-bg:   #FFE3E0;
+  --critico-txt:  #D9534F;
+
+  --sombra-card:  0 2px 8px rgba(0,0,0,0.04);
+  --sombra-md:    0 4px 16px rgba(0,0,0,0.05);
+  --sombra-lg:    0 8px 32px rgba(0,0,0,0.08);
+
+  --radio:        14px;
+  --radio-btn:    10px;
+  --radio-input:  8px;
+  --radio-sm:     6px;
+
+  --font: 'Inter', sans-serif;
+}
+
+/* ── Reset ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--texto);
+  min-height: 100dvh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ────────────────────────────────────────────────── */
+.app-wrapper {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 16px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ────────────────────────────────────────────────── */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0 14px;
+  border-bottom: 1px solid var(--borde);
+  margin-bottom: 20px;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 100;
+}
+
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--texto);
+  letter-spacing: -0.02em;
+}
+
+.app-logo-icon {
+  width: 30px;
+  height: 30px;
+  background: var(--verde);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+.app-rol-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--verde-claro);
+  color: var(--verde);
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--verde-suave);
+}
+
+.btn-logout {
+  background: none;
+  border: 1px solid var(--borde);
+  color: var(--texto-3);
+  padding: 6px 12px;
+  border-radius: var(--radio-btn);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-logout:hover { border-color: var(--critico-txt); color: var(--critico-txt); }
+
+/* ── Cards ─────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 20px;
+  margin-bottom: 14px;
+  box-shadow: var(--sombra-card);
+  animation: fadeUp 0.25s ease both;
+}
+
+.card-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--texto-3);
+  margin-bottom: 16px;
+}
+
+/* ── Botones ───────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 13px 20px;
+  border-radius: var(--radio-btn);
+  border: none;
+  cursor: pointer;
+  transition: all 0.18s;
+  text-decoration: none;
+  width: 100%;
+  letter-spacing: -0.01em;
+}
+
+.btn-primary {
+  background: var(--verde);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(115,154,99,0.25);
+}
+.btn-primary:hover  { background: var(--verde-hover); box-shadow: 0 4px 12px rgba(115,154,99,0.3); }
+.btn-primary:active { transform: scale(0.98); }
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--texto-2);
+  border: 1px solid var(--borde);
+}
+.btn-secondary:hover { background: var(--verde-claro); color: var(--verde); border-color: var(--verde-suave); }
+
+.btn-danger {
+  background: transparent;
+  color: var(--critico-txt);
+  border: 1px solid #F5C6C5;
+}
+.btn-danger:hover { background: var(--critico-bg); }
+
+.btn-sm {
+  font-size: 0.8rem;
+  padding: 8px 16px;
+  width: auto;
+}
+
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+/* ── Formularios ───────────────────────────────────────────── */
+.form-group { margin-bottom: 14px; }
+
+.form-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--texto-2);
+  margin-bottom: 6px;
+}
+
+.form-control {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1.5px solid var(--borde);
+  color: var(--texto);
+  font-family: var(--font);
+  font-size: 0.95rem;
+  padding: 11px 14px;
+  border-radius: var(--radio-input);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  -webkit-appearance: none;
+}
+.form-control:focus {
+  border-color: var(--borde-focus);
+  box-shadow: 0 0 0 3px rgba(115,154,99,0.12);
+}
+.form-control::placeholder { color: var(--texto-3); }
+
+select.form-control {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237D877F' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+  cursor: pointer;
+}
+
+/* ── Mensajes de estado ────────────────────────────────────── */
+.msg {
+  font-size: 0.85rem;
+  padding: 10px 14px;
+  border-radius: var(--radio-input);
+  margin-top: 10px;
+  display: none;
+  font-weight: 500;
+}
+.msg.show   { display: block; }
+.msg-error  { background: var(--critico-bg); color: var(--critico-txt); border: 1px solid #F5C6C5; }
+.msg-ok     { background: var(--normal-bg); color: var(--normal-txt); border: 1px solid #C3E0BF; }
+
+/* ── Spinner ───────────────────────────────────────────────── */
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+.spinner-verde {
+  border-color: var(--verde-suave);
+  border-top-color: var(--verde);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Pantalla de carga ─────────────────────────────────────── */
+#pantalla-carga {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 9999;
+  transition: opacity 0.3s;
+}
+
+#pantalla-carga .logo-loading {
+  font-family: var(--font);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--texto);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#pantalla-carga .logo-loading .icon-loading {
+  width: 36px;
+  height: 36px;
+  background: var(--verde);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+/* ── Empty state ───────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 32px 20px;
+  color: var(--texto-3);
+}
+.empty-state p { font-size: 0.9rem; margin-top: 8px; }
+
+/* ── Item rows ─────────────────────────────────────────────── */
+.item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--borde);
+  gap: 12px;
+}
+.item-row:last-child { border-bottom: none; }
+
+.item-nombre {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--texto);
+}
+
+.item-meta {
+  font-size: 0.75rem;
+  color: var(--texto-3);
+  margin-top: 2px;
+}
+
+/* ── Badges de stock ───────────────────────────────────────── */
+.stock-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.stock-badge.normal   { background: var(--normal-bg);  color: var(--normal-txt); }
+.stock-badge.bajo     { background: var(--bajo-bg);    color: var(--bajo-txt); }
+.stock-badge.critico  { background: var(--critico-bg); color: var(--critico-txt); }
+
+/* Stock numérico (para vistas de encargado/admin) */
+.item-stock {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--texto-2);
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* ── Tabs ──────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 3px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 4px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab-btn {
+  flex: 1;
+  min-width: max-content;
+  background: none;
+  border: none;
+  color: var(--texto-3);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+.tab-btn.active {
+  background: var(--bg-card);
+  color: var(--verde);
+  box-shadow: var(--sombra-card);
+}
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ── Badges de rol ─────────────────────────────────────────── */
+.badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+.badge-admin     { background: var(--verde-claro); color: var(--verde); border: 1px solid var(--verde-suave); }
+.badge-encargado { background: var(--bajo-bg);     color: var(--bajo-txt); }
+.badge-entrada   { background: var(--normal-bg);   color: var(--normal-txt); }
+.badge-salida    { background: var(--critico-bg);  color: var(--critico-txt); }
+
+/* ── Login ─────────────────────────────────────────────────── */
+.login-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-bottom: 40px;
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.login-logo-icon {
+  width: 56px;
+  height: 56px;
+  background: var(--verde);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  margin: 0 auto 16px;
+  box-shadow: 0 4px 16px rgba(115,154,99,0.3);
+}
+
+.login-logo h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--texto);
+  letter-spacing: -0.03em;
+}
+
+.login-logo p {
+  font-size: 0.85rem;
+  color: var(--texto-3);
+  margin-top: 4px;
+}
+
+/* ── Divisor ───────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--borde); margin: 16px 0; }
+
+/* ── Utilidades ────────────────────────────────────────────── */
+.text-center     { text-align: center; }
+.text-muted      { color: var(--texto-3); font-size: 0.85rem; }
+.mt-8            { margin-top: 8px; }
+.mt-16           { margin-top: 16px; }
+.mb-0            { margin-bottom: 0; }
+.gap-8           { gap: 8px; }
+.flex            { display: flex; }
+.flex-col        { flex-direction: column; }
+.items-center    { align-items: center; }
+.justify-between { justify-content: space-between; }
+
+/* ── Animaciones ───────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Tabs con wrap (admin desktop) ────────────────────────── */
+.tabs-wrap {
+  flex-wrap: wrap;
+  height: auto;
+}
+.tabs-wrap .tab-btn {
+  flex: 1 1 auto;
+  min-width: 80px;
+}
+
+/* ── Hover botón salida ────────────────────────────────────── */
+.btn-salida-admin:hover {
+  background: var(--critico-bg) !important;
+  border-color: var(--critico-txt) !important;
+  color: var(--critico-txt) !important;
+}
+
+/* Sello de versión (esquina inferior, sutil) */
+.app-version {
+  position: fixed;
+  bottom: 6px;
+  right: 8px;
+  font-size: 0.62rem;
+  color: var(--texto-3);
+  opacity: 0.5;
+  z-index: 50;
+  pointer-events: none;
+  font-family: monospace;
+  letter-spacing: 0.5px;
+}

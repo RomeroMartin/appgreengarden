@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#FAFAF7" />
+  <title>Green Garden — Encargado</title>
+  <link rel="stylesheet" href="../css/estilos.css" />
+  <style>
+    .modal-overlay{position:fixed;inset:0;background:rgba(35,42,36,0.4);z-index:200;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity 0.25s;}
+    .modal-overlay.open{opacity:1;pointer-events:all;}
+    .modal{background:var(--bg-card);border:1px solid var(--borde);border-radius:var(--radio) var(--radio) 0 0;box-shadow:0 -4px 32px rgba(0,0,0,0.08);padding:24px 20px;width:100%;max-width:480px;margin:0 auto;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);max-height:92dvh;overflow-y:auto;}
+    .modal-overlay.open .modal{transform:translateY(0);}
+    .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+    .modal-titulo{font-size:1rem;font-weight:700;}
+    .btn-cerrar-modal{background:var(--bg-secondary);border:none;color:var(--texto-3);font-size:1.1rem;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+    .cant-btn-e{background:var(--bg-secondary);border:none;color:var(--texto-2);font-size:1.3rem;width:46px;height:46px;cursor:pointer;font-weight:500;flex-shrink:0;}
+    .cant-btn-e:hover{background:var(--verde-suave);color:var(--verde);}
+    .cant-input-e{flex:1;border:none;outline:none;font-family:var(--font);font-size:1.2rem;font-weight:700;text-align:center;color:var(--texto);background:transparent;padding:0;}
+    .cant-control{display:flex;align-items:center;border:1.5px solid var(--borde);border-radius:var(--radio-input);overflow:hidden;transition:border-color 0.2s;}
+    .cant-control:focus-within{border-color:var(--borde-focus);box-shadow:0 0 0 3px rgba(115,154,99,0.12);}
+    .mov-row{padding:10px 0;border-bottom:1px solid var(--borde);}
+    .mov-row:last-child{border-bottom:none;}
+  </style>
+</head>
+<body>
+  <div id="pantalla-carga"><div class="logo-loading"><div class="icon-loading">🌿</div>Green Garden</div><div class="spinner spinner-verde"></div></div>
+
+  <div class="app-wrapper" id="contenido" style="display:none;">
+    <header class="app-header">
+      <div class="app-logo"><div class="app-logo-icon">🌿</div>Green Garden</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="app-rol-badge">Encargado</span>
+        <button class="btn-logout" id="btn-logout">Salir</button>
+      </div>
+    </header>
+
+    <div style="margin-bottom:16px;">
+      <p style="font-size:1rem;font-weight:700;" id="saludo">Hola 👋</p>
+      <p style="font-size:0.8rem;color:var(--texto-3);" id="fecha-hoy"></p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+      <button class="btn btn-primary" id="btn-abrir-entrada">↑ Entrada</button>
+      <button class="btn btn-secondary" id="btn-abrir-salida" style="border-color:#F5C6C5;color:var(--critico-txt);">↓ Retiro</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="inventario">📦 Inventario</button>
+      <button class="tab-btn" data-tab="movimientos">🔄 Movimientos</button>
+    </div>
+
+    <div class="tab-content active" id="tab-inventario">
+      <div id="seccion-alertas" style="display:none;margin-bottom:14px;">
+        <div style="background:var(--critico-bg);border:1px solid #F5C6C5;border-radius:var(--radio);padding:14px 16px;">
+          <p style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--critico-txt);margin-bottom:10px;">⚠️ Productos bajo mínimo</p>
+          <div id="lista-alertas"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <select class="form-control" id="filtro-sector" style="font-size:0.85rem;padding:10px 12px;"><option value="">Todos los sectores</option></select>
+        <select class="form-control" id="filtro-rubro" style="font-size:0.85rem;padding:10px 12px;"><option value="">Todos los rubros</option></select>
+      </div>
+      <input class="form-control" type="search" id="filtro-busqueda" placeholder="Buscar producto..." style="margin-bottom:14px;" />
+      <div class="card" style="padding:0 20px;"><div id="lista-inventario"><div class="empty-state"><div class="spinner spinner-verde"></div></div></div></div>
+    </div>
+
+    <div class="tab-content" id="tab-movimientos">
+      <div class="card" style="padding:16px 20px;margin-bottom:14px;">
+        <p class="card-title">Filtros</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <select class="form-control" id="filtro-mov-tipo" style="font-size:0.85rem;padding:9px 12px;"><option value="">Todos</option><option value="INGRESO_PROVEEDOR">Ingreso Proveedor</option><option value="INGRESO_PRODUCCION">Ingreso Producción</option><option value="RETIRO">Retiro</option></select>
+          <select class="form-control" id="filtro-mov-producto" style="font-size:0.85rem;padding:9px 12px;"><option value="">Todos los productos</option></select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+          <div><label style="font-size:0.75rem;color:var(--texto-3);display:block;margin-bottom:4px;">Desde</label><input type="date" class="form-control" id="filtro-mov-desde" style="font-size:0.85rem;padding:9px 12px;" /></div>
+          <div><label style="font-size:0.75rem;color:var(--texto-3);display:block;margin-bottom:4px;">Hasta</label><input type="date" class="form-control" id="filtro-mov-hasta" style="font-size:0.85rem;padding:9px 12px;" /></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button class="btn btn-secondary btn-sm" id="btn-aplicar-mov" style="width:100%;">Aplicar</button>
+          <button class="btn btn-secondary btn-sm" id="btn-limpiar-mov" style="width:100%;color:var(--texto-3);">Limpiar</button>
+        </div>
+      </div>
+      <button class="btn btn-secondary" id="btn-exportar-excel-enc" style="margin-bottom:14px;border-color:var(--verde);color:var(--verde);">📥 Exportar a Excel</button>
+      <div class="card" style="padding:0 20px;"><div id="lista-movimientos"><div class="empty-state"><div class="spinner spinner-verde"></div></div></div></div>
+    </div>
+  </div>
+
+  <!-- MODAL ENTRADA -->
+  <div class="modal-overlay" id="modal-entrada">
+    <div class="modal">
+      <div class="modal-header"><span class="modal-titulo">↑ Registrar Entrada</span><button class="btn-cerrar-modal" data-cerrar="modal-entrada">×</button></div>
+      <div class="form-group"><label class="form-label">Tipo</label><select class="form-control" id="ent-tipo"><option value="INGRESO_PROVEEDOR">Ingreso Proveedor</option><option value="INGRESO_PRODUCCION">Ingreso Producción</option></select></div>
+      <div class="form-group"><label class="form-label">Buscar producto</label><input class="form-control" type="search" id="ent-busqueda" placeholder="Escribí el nombre..." /></div>
+      <div class="form-group"><label class="form-label">Producto</label><select class="form-control" id="ent-producto"></select></div>
+      <div class="form-group"><label class="form-label">Cantidad <span id="ent-unidad" style="color:var(--verde);font-weight:600;"></span></label><div class="cant-control"><button class="cant-btn-e" id="ent-menos">−</button><input class="cant-input-e" type="number" id="ent-cantidad" value="1" min="0.1" step="0.1" /><button class="cant-btn-e" id="ent-mas">+</button></div></div>
+      <div class="form-group"><label class="form-label">Observaciones (opcional)</label><input class="form-control" type="text" id="ent-obs" /></div>
+      <div id="msg-entrada" class="msg"></div>
+      <div class="mt-16"><button class="btn btn-primary" id="btn-confirmar-entrada">Registrar entrada</button></div>
+    </div>
+  </div>
+
+  <!-- MODAL RETIRO -->
+  <div class="modal-overlay" id="modal-salida">
+    <div class="modal">
+      <div class="modal-header"><span class="modal-titulo">↓ Registrar Retiro</span><button class="btn-cerrar-modal" data-cerrar="modal-salida">×</button></div>
+      <div class="form-group"><label class="form-label">Buscar producto</label><input class="form-control" type="search" id="sal-busqueda" placeholder="Escribí el nombre..." /></div>
+      <div class="form-group"><label class="form-label">Producto (desde acopio)</label><select class="form-control" id="sal-producto"></select></div>
+      <div class="form-group" id="sal-grupo-origen" style="display:none;"><label class="form-label">¿De dónde retirás? <span style="color:var(--texto-3);font-weight:400;">(el acopio está sin stock)</span></label><select class="form-control" id="sal-origen"></select></div>
+      <div id="sal-info-destino" style="display:none;margin-bottom:14px;"></div>
+      <div class="form-group" id="sal-grupo-sector" style="display:none;"><label class="form-label">¿A qué sector de despacho va?</label><select class="form-control" id="sal-sector-destino"></select></div>
+      <div class="form-group"><label class="form-label">Cantidad <span id="sal-unidad" style="color:var(--critico-txt);font-weight:600;"></span></label><div class="cant-control"><button class="cant-btn-e" id="sal-menos">−</button><input class="cant-input-e" type="number" id="sal-cantidad" value="1" min="0.1" step="0.1" /><button class="cant-btn-e" id="sal-mas">+</button></div></div>
+      <div class="form-group"><label class="form-label">Motivo</label><select class="form-control" id="sal-motivo"></select></div>
+      <div class="form-group"><label class="form-label">Observaciones (opcional)</label><input class="form-control" type="text" id="sal-obs" /></div>
+      <div id="msg-salida" class="msg"></div>
+      <div class="mt-16"><button class="btn btn-primary" id="btn-confirmar-salida" style="background:var(--critico-txt);">Registrar retiro</button></div>
+    </div>
+  </div>
+
+  <div class="app-version"></div>
+  <script type="module" src="../js/version.js"></script>
+  <script type="module" src="../js/encargado.js"></script>
+</body>
+</html>

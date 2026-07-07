@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#FAFAF7" />
+  <title>Green Garden — Administrador</title>
+  <link rel="stylesheet" href="../css/estilos.css" />
+  <style>
+    .modal-overlay { position:fixed; inset:0; background:rgba(35,42,36,0.4); z-index:200; display:flex; align-items:flex-end; opacity:0; pointer-events:none; transition:opacity 0.25s; }
+    .modal-overlay.open { opacity:1; pointer-events:all; }
+    .modal { background:var(--bg-card); border:1px solid var(--borde); border-radius:var(--radio) var(--radio) 0 0; box-shadow:0 -4px 32px rgba(0,0,0,0.08); padding:24px 20px; width:100%; max-width:480px; margin:0 auto; transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1); max-height:92dvh; overflow-y:auto; }
+    .modal-overlay.open .modal { transform:translateY(0); }
+    .modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+    .modal-titulo { font-size:1rem; font-weight:700; }
+    .btn-cerrar-modal { background:var(--bg-secondary); border:none; color:var(--texto-3); font-size:1.1rem; cursor:pointer; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+    .cant-btn-a { background:var(--bg-secondary); border:none; color:var(--texto-2); font-size:1.3rem; width:46px; height:46px; cursor:pointer; font-weight:500; flex-shrink:0; }
+    .cant-btn-a:hover { background:var(--verde-suave); color:var(--verde); }
+    .cant-input-a { flex:1; border:none; outline:none; font-family:var(--font); font-size:1.2rem; font-weight:700; text-align:center; color:var(--texto); background:transparent; padding:0; }
+    .cant-control { display:flex; align-items:center; border:1.5px solid var(--borde); border-radius:var(--radio-input); overflow:hidden; transition:border-color 0.2s; }
+    .cant-control:focus-within { border-color:var(--borde-focus); box-shadow:0 0 0 3px rgba(115,154,99,0.12); }
+    .mov-row { padding:12px 0; border-bottom:1px solid var(--borde); }
+    .mov-row:last-child { border-bottom:none; }
+    .mov-header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; }
+    .mov-producto { font-size:0.9rem; font-weight:600; flex:1; }
+    .mov-meta { font-size:0.75rem; color:var(--texto-3); }
+  </style>
+</head>
+<body>
+  <div id="pantalla-carga"><div class="logo-loading"><div class="icon-loading">🌿</div>Green Garden</div><div class="spinner spinner-verde"></div></div>
+
+  <div class="app-wrapper" id="contenido" style="display:none;">
+    <header class="app-header">
+      <div class="app-logo"><div class="app-logo-icon">🌿</div>Green Garden</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="app-rol-badge">Admin</span>
+        <button class="btn-logout" id="btn-logout">Salir</button>
+      </div>
+    </header>
+
+    <div class="tabs tabs-wrap">
+      <button class="tab-btn active" data-tab="stock">📦 Stock</button>
+      <button class="tab-btn" data-tab="movimientos">🔄 Movimientos</button>
+      <button class="tab-btn" data-tab="historial">📋 Historial</button>
+    </div>
+
+    <!-- TAB STOCK -->
+    <div class="tab-content active" id="tab-stock">
+      <div id="indicador-corte" style="margin-bottom:14px;"></div>
+      <div id="seccion-alertas" style="display:none;margin-bottom:14px;">
+        <div style="background:var(--critico-bg);border:1px solid #F5C6C5;border-radius:var(--radio);padding:14px 16px;">
+          <div id="alertas-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;">
+            <p style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--critico-txt);margin:0;">⚠️ Productos bajo mínimo <span id="alertas-count"></span></p>
+            <span id="alertas-chevron" style="color:var(--critico-txt);font-size:0.8rem;transition:transform .2s;">▼</span>
+          </div>
+          <div id="lista-alertas" style="margin-top:10px;display:none;"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <select class="form-control" id="filtro-sector" style="font-size:0.85rem;padding:10px 12px;"><option value="">Todos los sectores</option></select>
+        <select class="form-control" id="filtro-rubro" style="font-size:0.85rem;padding:10px 12px;"><option value="">Todos los rubros</option></select>
+      </div>
+      <input class="form-control" type="search" id="filtro-busqueda" placeholder="Buscar producto..." style="margin-bottom:14px;" />
+      <div class="card" style="padding:0 20px;"><div id="lista-stock"><div class="empty-state"><div class="spinner spinner-verde"></div></div></div></div>
+    </div>
+
+    <!-- TAB MOVIMIENTOS -->
+    <div class="tab-content" id="tab-movimientos">
+      <!-- SUB-PANTALLA CONTEO FÍSICO -->
+      <div id="pantalla-conteo" style="display:none;">
+        <button class="btn btn-secondary btn-sm" id="conteo-btn-volver" style="margin-bottom:14px;">← Volver a Movimientos</button>
+        <div class="card">
+          <p class="card-title">📋 Conteo Físico</p>
+          <p style="font-size:0.82rem;color:var(--texto-3);margin-bottom:12px;">Escribí las cantidades reales que contaste. Lo que dejes vacío no se toca. El stock queda igual a tu conteo.</p>
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+            <select class="form-control" id="conteo-filtro-rubro" style="flex:1;min-width:140px;font-size:0.85rem;padding:9px;"><option value="">Todos los rubros</option></select>
+            <input class="form-control" type="search" id="conteo-filtro-busqueda" placeholder="Buscar..." style="flex:1;min-width:120px;font-size:0.85rem;padding:9px;" />
+            <button class="btn btn-secondary btn-sm" id="conteo-btn-cargar">Recargar</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+              <thead><tr style="background:var(--verde);color:#fff;">
+                <th style="padding:8px;text-align:left;font-size:0.74rem;">Producto</th>
+                <th style="padding:8px;text-align:center;font-size:0.74rem;">Acopio actual</th>
+                <th style="padding:8px;text-align:center;font-size:0.74rem;">Conteo acopio</th>
+                <th style="padding:8px;text-align:left;font-size:0.74rem;">Despacho (conteo)</th>
+              </tr></thead>
+              <tbody id="conteo-tbody"><tr><td colspan="4" style="padding:20px;text-align:center;color:var(--texto-3);">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+          <div id="conteo-msg" class="msg" style="margin-top:12px;"></div>
+          <button class="btn btn-primary" id="conteo-btn-aplicar" style="margin-top:14px;">Aplicar conteo al inventario</button>
+        </div>
+      </div>
+
+      <div id="pantalla-movimientos-normal">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <button class="btn btn-primary" id="btn-mov-entrada">↑ Entrada</button>
+        <button class="btn btn-secondary" id="btn-mov-salida" style="border-color:#F5C6C5;color:var(--critico-txt);">↓ Retiro</button>
+      </div>
+      <button class="btn btn-secondary" id="btn-mov-venta" style="margin-bottom:10px;border-color:var(--verde);color:var(--verde);">💰 Venta</button>
+      <button class="btn btn-secondary" id="btn-mov-ajuste" style="margin-bottom:10px;border-color:var(--texto-3);color:var(--texto-3);">⚖️ Ajuste de Inventario</button>
+      <button class="btn btn-secondary" id="btn-mov-importar" style="margin-bottom:20px;border-color:var(--verde);color:var(--verde);">📥 Importar ventas desde Excel</button>
+      <div class="card" style="padding:0 20px;">
+        <p style="padding:14px 0 10px;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--texto-3);">Últimos movimientos</p>
+        <div id="lista-mov-recientes"><div class="empty-state"><div class="spinner spinner-verde"></div></div></div>
+      </div>
+    </div>
+
+    </div>
+
+    <!-- TAB HISTORIAL -->
+    <div class="tab-content" id="tab-historial">
+      <div class="card" style="padding:16px 20px;margin-bottom:14px;">
+        <p class="card-title">Filtros</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <select class="form-control" id="filtro-hist-tipo" style="font-size:0.85rem;padding:9px 12px;">
+            <option value="">Todos</option>
+            <option value="INGRESO_PROVEEDOR">Ingreso Proveedor</option>
+            <option value="INGRESO_PRODUCCION">Ingreso Producción</option>
+            <option value="RETIRO">Retiro</option>
+            <option value="VENTA">Venta</option>
+            <option value="AJUSTE">Ajuste</option>
+          </select>
+          <select class="form-control" id="filtro-hist-usuario" style="font-size:0.85rem;padding:9px 12px;"><option value="">Todos los usuarios</option></select>
+        </div>
+        <select class="form-control" id="filtro-hist-producto" style="font-size:0.85rem;padding:9px 12px;margin-bottom:8px;"><option value="">Todos los productos</option></select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+          <div><label style="font-size:0.75rem;color:var(--texto-3);display:block;margin-bottom:4px;">Desde</label><input type="date" class="form-control" id="filtro-hist-desde" style="font-size:0.85rem;padding:9px 12px;" /></div>
+          <div><label style="font-size:0.75rem;color:var(--texto-3);display:block;margin-bottom:4px;">Hasta</label><input type="date" class="form-control" id="filtro-hist-hasta" style="font-size:0.85rem;padding:9px 12px;" /></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button class="btn btn-secondary btn-sm" id="btn-aplicar-filtros" style="width:100%;">Aplicar</button>
+          <button class="btn btn-secondary btn-sm" id="btn-limpiar-filtros" style="width:100%;color:var(--texto-3);">Limpiar</button>
+        </div>
+      </div>
+      <button class="btn btn-secondary" id="btn-exportar-excel" style="margin-bottom:14px;border-color:var(--verde);color:var(--verde);">📥 Exportar a Excel</button>
+      <div class="card" style="padding:0 20px;"><div id="lista-historial"><div class="empty-state"><div class="spinner spinner-verde"></div></div></div></div>
+    </div>
+  </div>
+
+  <!-- MODAL ENTRADA -->
+  <div class="modal-overlay" id="modal-entrada">
+    <div class="modal">
+      <div class="modal-header"><span class="modal-titulo">↑ Registrar Entrada</span><button class="btn-cerrar-modal" data-cerrar="modal-entrada">×</button></div>
+      <div class="form-group"><label class="form-label">Tipo</label><select class="form-control" id="ent-tipo"><option value="INGRESO_PROVEEDOR">Ingreso Proveedor</option><option value="INGRESO_PRODUCCION">Ingreso Producción</option></select></div>
+      <div class="form-group"><label class="form-label">Buscar producto</label><input class="form-control" type="search" id="ent-busqueda" placeholder="Escribí el nombre..." /></div>
+      <div class="form-group"><label class="form-label">Producto</label><select class="form-control" id="ent-producto"></select></div>
+      <div class="form-group"><label class="form-label">Cantidad <span id="ent-unidad" style="color:var(--verde);font-weight:600;"></span></label><div class="cant-control"><button class="cant-btn-a" id="ent-menos">−</button><input class="cant-input-a" type="number" id="ent-cantidad" value="1" min="0.1" step="0.1" /><button class="cant-btn-a" id="ent-mas">+</button></div></div>
+      <div class="form-group"><label class="form-label">Observaciones (opcional)</label><input class="form-control" type="text" id="ent-obs" /></div>
+      <div id="msg-entrada" class="msg"></div>
+      <div class="mt-16"><button class="btn btn-primary" id="btn-confirmar-entrada">Registrar entrada</button></div>
+    </div>
+  </div>
+
+  <!-- MODAL RETIRO -->
+  <div class="modal-overlay" id="modal-salida">
+    <div class="modal">
+      <div class="modal-header"><span class="modal-titulo">↓ Registrar Retiro</span><button class="btn-cerrar-modal" data-cerrar="modal-salida">×</button></div>
+      <div class="form-group"><label class="form-label">Buscar producto</label><input class="form-control" type="search" id="sal-busqueda" placeholder="Escribí el nombre..." /></div>
+      <div class="form-group"><label class="form-label">Producto</label><select class="form-control" id="sal-producto"></select></div>
+      <div class="form-group" id="sal-grupo-origen" style="display:none;"><label class="form-label">¿De dónde se retira?</label><select class="form-control" id="sal-origen"></select></div>
+      <div id="sal-info-destino" style="display:none;margin-bottom:14px;"></div>
+      <div class="form-group" id="sal-grupo-sector" style="display:none;"><label class="form-label">¿A qué sector de despacho va?</label><select class="form-control" id="sal-sector-destino"></select></div>
+      <div class="form-group"><label class="form-label">Cantidad <span id="sal-unidad" style="color:var(--critico-txt);font-weight:600;"></span></label><div class="cant-control"><button class="cant-btn-a" id="sal-menos">−</button><input class="cant-input-a" type="number" id="sal-cantidad" value="1" min="0.1" step="0.1" /><button class="cant-btn-a" id="sal-mas">+</button></div></div>
+      <div class="form-group"><label class="form-label">Motivo</label><select class="form-control" id="sal-motivo"></select></div>
+      <div class="form-group"><label class="form-label">Observaciones (opcional)</label><input class="form-control" type="text" id="sal-obs" /></div>
+      <div id="msg-salida" class="msg"></div>
+      <div class="mt-16"><button class="btn btn-primary" id="btn-confirmar-salida" style="background:var(--critico-txt);">Registrar retiro</button></div>
+    </div>
+  </div>
+
+  <!-- MODAL VENTA -->
+  <div class="modal-overlay" id="modal-venta">
+    <div class="modal">
+      <div class="modal-header"><span class="modal-titulo">💰 Registrar Venta</span><button class="btn-cerrar-modal" data-cerrar="modal-venta">×</button></div>
+      <div class="form-group"><label class="form-label">Buscar producto</label><input class="form-control" type="search" id="vta-busqueda" placeholder="Escribí el nombre..." /></div>
+      <div class="form-group"><label class="form-label">Producto (solo de despacho)</label><select class="form-control" id="vta-producto"></select></div>
+      <div class="form-group"><label class="form-label">Sector de despacho origen</label><select class="form-control" id="vta-sector"></select></div>
+      <div class="form-group"><label class="form-label">Cantidad <span id="vta-unidad" style="color:var(--verde);font-weight:600;"></span></label><div class="cant-control"><button class="cant-btn-a" id="vta-menos">−</button><input class="cant-input-a" type="number" id="vta-cantidad" value="1" min="0.1" step="0.1" /><button class="cant-btn-a" id="vta-mas">+</button></div></div>
+      <div class="form-group"><label class="form-label">Observaciones (opcional)</label><input class="form-control" type="text" id="vta-obs" /></div>
+      <div style="background:var(--bg-secondary);border-radius:var(--radio-input);padding:12px;margin-bottom:14px;">
+        <p style="font-size:0.78rem;font-weight:700;color:var(--texto-2);margin-bottom:8px;">Período de esta venta</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div><label style="font-size:0.72rem;color:var(--texto-3);display:block;margin-bottom:3px;">Desde</label><input type="datetime-local" class="form-control" id="vta-desde" style="font-size:0.82rem;padding:8px;" /></div>
+          <div><label style="font-size:0.72rem;color:var(--texto-3);display:block;margin-bottom:3px;">Hasta</label><input type="datetime-local" class="form-control" id="vta-hasta" style="font-size:0.82rem;padding:8px;" /></div>
+        </div>
+      </div>
+      <div id="msg-venta" class="msg"></div>
+      <div class="mt-16"><button class="btn btn-primary" id="btn-confirmar-venta">Confirmar venta</button></div>
+    </div>
+  </div>
+
+  <!-- MODAL AJUSTE -->
+  <div class="modal-overlay" id="modal-ajuste">
+    <div class="modal">
+      <div class="modal-header"><span class="modal-titulo">⚖️ Ajuste de Inventario</span><button class="btn-cerrar-modal" data-cerrar="modal-ajuste">×</button></div>
+      <div class="form-group"><label class="form-label">Buscar producto</label><input class="form-control" type="search" id="ajt-busqueda" placeholder="Escribí el nombre..." /></div>
+      <div class="form-group"><label class="form-label">Producto</label><select class="form-control" id="ajt-producto"></select></div>
+      <div class="form-group"><label class="form-label">Ubicación a ajustar</label><select class="form-control" id="ajt-ubicacion"></select></div>
+      <div class="form-group"><label class="form-label">Nuevo stock real <span id="ajt-unidad" style="color:var(--texto-3);font-weight:600;"></span> <span id="ajt-actual" style="color:var(--texto-3);font-weight:400;font-size:0.8rem;"></span></label><input class="form-control" type="number" id="ajt-stock" placeholder="0" step="0.1" /></div>
+      <div class="form-group"><label class="form-label">Motivo del ajuste</label><input class="form-control" type="text" id="ajt-motivo" placeholder="Ej: Conteo físico de turno" /></div>
+      <div id="msg-ajuste" class="msg"></div>
+      <div class="mt-16"><button class="btn btn-secondary" id="btn-confirmar-ajuste" style="border-color:var(--texto-3);color:var(--texto-3);">Aplicar ajuste</button></div>
+    </div>
+  </div>
+
+
+  <!-- MODAL IMPORTAR VENTAS -->
+  <div class="modal-overlay" id="modal-importar">
+    <div class="modal" style="max-width:560px;">
+      <div class="modal-header"><span class="modal-titulo">📥 Importar ventas desde Excel</span><button class="btn-cerrar-modal" data-cerrar="modal-importar">×</button></div>
+
+      <!-- Paso 1: subir archivo -->
+      <div id="import-paso-1">
+        <p style="font-size:0.85rem;color:var(--texto-2);margin-bottom:14px;">Subí el archivo de consumos que genera tu software de gestión. La app va a buscar cada producto por su <b>código PLU</b> y te va a mostrar una vista previa antes de descontar nada.</p>
+        <label for="import-file" class="btn btn-secondary" style="cursor:pointer;display:block;text-align:center;border-style:dashed;border-color:var(--verde);color:var(--verde);padding:24px;">
+          📂 Seleccionar archivo Excel (.xls / .xlsx)
+        </label>
+        <input type="file" id="import-file" accept=".xls,.xlsx" style="display:none;" />
+        <div id="msg-import" class="msg"></div>
+      </div>
+
+      <!-- Paso 2: vista previa -->
+      <div id="import-paso-2" style="display:none;">
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <div style="flex:1;background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:10px;text-align:center;">
+            <div style="font-size:1.3rem;font-weight:700;color:var(--verde);" id="import-count-ok">0</div>
+            <div style="font-size:0.7rem;color:var(--texto-3);">a descontar</div>
+          </div>
+          <div style="flex:1;background:var(--bg-secondary);border:1px solid var(--borde);border-radius:var(--radio-input);padding:10px;text-align:center;">
+            <div style="font-size:1.3rem;font-weight:700;color:var(--texto-3);" id="import-count-ignorados">0</div>
+            <div style="font-size:0.7rem;color:var(--texto-3);">ignorados</div>
+          </div>
+        </div>
+        <div id="import-fecha-corte"></div>
+        <div style="max-height:42vh;overflow-y:auto;margin-bottom:14px;" id="import-preview-lista"></div>
+        <div id="msg-import-2" class="msg"></div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-secondary" id="btn-import-cancelar" style="flex:1;">Cancelar</button>
+          <button class="btn btn-primary" id="btn-import-confirmar" style="flex:1.4;">Confirmar y descontar</button>
+        </div>
+      </div>
+
+      <!-- Paso 3: resultado -->
+      <div id="import-paso-3" style="display:none;">
+        <div style="text-align:center;padding:10px 0 16px;">
+          <div style="font-size:2.4rem;">✅</div>
+          <p style="font-size:1rem;font-weight:700;margin-top:6px;" id="import-resultado-titulo">Ventas importadas</p>
+          <p style="font-size:0.85rem;color:var(--texto-3);" id="import-resultado-detalle"></p>
+        </div>
+        <button class="btn btn-primary" id="btn-import-cerrar">Listo</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL ELECCIÓN TIPO DE AJUSTE -->
+  <div class="modal-overlay" id="modal-ajuste-tipo">
+    <div class="modal">
+      <div class="modal-header"><span class="modal-titulo">⚖️ Ajuste de Inventario</span><button class="btn-cerrar-modal" data-cerrar="modal-ajuste-tipo">×</button></div>
+      <p style="font-size:0.85rem;color:var(--texto-2);margin-bottom:16px;">¿Cómo querés ajustar el inventario?</p>
+      <button class="btn btn-secondary" id="btn-ajuste-rapido" style="margin-bottom:10px;width:100%;text-align:left;padding:14px 16px;">
+        <div style="font-weight:700;">⚡ Ajuste rápido</div>
+        <div style="font-size:0.78rem;color:var(--texto-3);font-weight:400;">Corregir el acopio de un solo producto</div>
+      </button>
+      <button class="btn btn-secondary" id="btn-ajuste-conteo" style="width:100%;text-align:left;padding:14px 16px;">
+        <div style="font-weight:700;">📋 Conteo físico</div>
+        <div style="font-size:0.78rem;color:var(--texto-3);font-weight:400;">Ajustar acopio y despacho de varios productos a la vez</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL CORREGIR MOTIVO DE UN RETIRO -->
+  <div class="modal-overlay" id="modal-editar-motivo">
+    <div class="modal">
+      <div class="modal-header"><span class="modal-titulo">✏️ Corregir motivo del retiro</span><button class="btn-cerrar-modal" data-cerrar="modal-editar-motivo">×</button></div>
+      <div id="edm-info" style="background:var(--bg-secondary);border:1px solid var(--borde);border-radius:var(--radio-input);padding:10px 14px;margin-bottom:14px;font-size:0.85rem;"></div>
+      <div class="form-group"><label class="form-label">Nuevo motivo</label><select class="form-control" id="edm-motivo"></select></div>
+      <div class="form-group" id="edm-grupo-sector" style="display:none;"><label class="form-label">Sector de despacho destino</label><select class="form-control" id="edm-sector"></select></div>
+      <div id="edm-preview" style="font-size:0.8rem;color:var(--texto-2);background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:9px 12px;margin-bottom:12px;"></div>
+      <div id="msg-editar-motivo" class="msg"></div>
+      <div class="mt-16"><button class="btn btn-secondary" id="btn-confirmar-editar-motivo" style="border-color:var(--texto-3);color:var(--texto-3);">Aplicar corrección</button></div>
+    </div>
+  </div>
+
+  <div class="app-version"></div>
+  <script type="module" src="../js/version.js"></script>
+  <script type="module" src="../js/administrador.js"></script>
+</body>
+</html>

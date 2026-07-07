@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Green Garden — Manual de Usuario v3.8</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --negro:#1c1b18;
+    --tinta:#2c2a26;
+    --dorado:#c2a35e;
+    --dorado-hondo:#9a7f43;
+    --crema:#f8f4ea;
+    --arena:#ece3d2;
+    --arena-borde:#ddd0b8;
+    --verde:#2d6a4f;
+    --verde-claro:#e7f0ea;
+    --rojo:#b04a3a;
+    --gris:#7c766b;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    background:var(--arena);
+    color:var(--tinta);
+    font-family:"Plus Jakarta Sans",system-ui,sans-serif;
+    font-weight:400;
+    line-height:1.65;
+    font-size:16px;
+  }
+  .hoja{
+    max-width:780px;
+    margin:0 auto;
+    background:var(--crema);
+    box-shadow:0 1px 40px rgba(28,27,24,0.12);
+  }
+
+  /* ---------- PORTADA ---------- */
+  .portada{
+    background:var(--negro);
+    color:var(--crema);
+    padding:80px 56px 64px;
+    position:relative;
+    overflow:hidden;
+  }
+  .portada::after{
+    content:"";
+    position:absolute;
+    left:56px;right:56px;bottom:48px;
+    height:1px;
+    background:linear-gradient(90deg,var(--dorado),transparent);
+  }
+  .sello{
+    width:84px;height:84px;border-radius:50%;
+    border:1.5px solid var(--dorado);
+    display:flex;align-items:center;justify-content:center;
+    font-family:"Cormorant Garamond",serif;
+    font-weight:600;font-size:38px;color:var(--dorado);
+    letter-spacing:1px;
+    margin-bottom:36px;
+  }
+  .portada .kicker{
+    font-size:0.72rem;letter-spacing:0.35em;text-transform:uppercase;
+    color:var(--dorado);font-weight:600;margin-bottom:18px;
+  }
+  .portada h1{
+    font-family:"Cormorant Garamond",serif;
+    font-weight:500;
+    font-size:3.5rem;
+    line-height:1.04;
+    margin:0 0 8px;
+    color:var(--crema);
+  }
+  .portada h1 em{font-style:italic;color:var(--dorado);}
+  .portada .sub{font-size:1rem;color:#cfc6b4;max-width:42ch;margin-top:14px;}
+  .portada .meta{
+    margin-top:44px;font-size:0.82rem;color:#9f968540;color:#a59c89;
+    display:flex;gap:28px;flex-wrap:wrap;
+  }
+  .portada .meta strong{color:var(--crema);font-weight:600;display:block;font-size:0.95rem;}
+
+  /* ---------- CUERPO ---------- */
+  .cuerpo{padding:8px 56px 64px;}
+
+  .indice{
+    background:var(--arena);
+    border:1px solid var(--arena-borde);
+    border-radius:10px;
+    padding:24px 28px;
+    margin:44px 0 8px;
+  }
+  .indice h2{
+    font-family:"Plus Jakarta Sans",sans-serif;
+    font-size:0.72rem;letter-spacing:0.25em;text-transform:uppercase;
+    color:var(--dorado-hondo);font-weight:700;margin:0 0 14px;
+  }
+  .indice ol{margin:0;padding:0;list-style:none;counter-reset:idx;}
+  .indice li{
+    counter-increment:idx;
+    display:flex;align-items:baseline;gap:12px;
+    padding:5px 0;font-size:0.95rem;color:var(--tinta);
+    border-bottom:1px dotted var(--arena-borde);
+  }
+  .indice li:last-child{border-bottom:none;}
+  .indice li::before{
+    content:counter(idx,decimal-leading-zero);
+    font-family:"Cormorant Garamond",serif;font-weight:600;
+    color:var(--dorado);font-size:1.05rem;min-width:26px;
+  }
+  .indice .nuevo{
+    font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;
+    background:var(--verde);color:#fff;padding:1px 7px;border-radius:20px;
+    font-weight:700;margin-left:auto;
+  }
+
+  section.seccion{margin-top:56px;}
+  .seccion-cabecera{
+    display:flex;align-items:flex-start;gap:18px;
+    border-bottom:2px solid var(--negro);
+    padding-bottom:14px;margin-bottom:24px;
+  }
+  .seccion-num{
+    font-family:"Cormorant Garamond",serif;
+    font-size:3.2rem;font-weight:500;line-height:0.8;
+    color:var(--dorado);flex-shrink:0;
+  }
+  .seccion-cabecera h2{
+    font-family:"Cormorant Garamond",serif;
+    font-weight:600;font-size:2rem;line-height:1.1;margin:6px 0 0;
+    color:var(--negro);
+  }
+  .seccion-cabecera .lede{font-size:0.9rem;color:var(--gris);margin-top:3px;}
+
+  h3{
+    font-family:"Plus Jakarta Sans",sans-serif;
+    font-size:1.06rem;font-weight:700;color:var(--negro);
+    margin:30px 0 8px;
+  }
+  h3 .n{color:var(--dorado-hondo);font-weight:700;margin-right:8px;}
+  p{margin:0 0 14px;}
+  a{color:var(--verde);}
+  strong{color:var(--negro);font-weight:600;}
+  ul{margin:0 0 16px;padding-left:0;list-style:none;}
+  ul li{position:relative;padding-left:22px;margin-bottom:8px;}
+  ul li::before{
+    content:"";position:absolute;left:4px;top:0.62em;
+    width:6px;height:6px;border-radius:50%;background:var(--dorado);
+  }
+
+  /* Tarjetas / avisos */
+  .nota{
+    border-left:3px solid var(--dorado);
+    background:var(--arena);
+    padding:14px 18px;border-radius:0 8px 8px 0;
+    margin:18px 0;font-size:0.92rem;
+  }
+  .nota.verde{border-left-color:var(--verde);background:var(--verde-claro);}
+  .nota.rojo{border-left-color:var(--rojo);background:#f6e9e6;}
+  .nota .et{
+    display:block;font-size:0.68rem;letter-spacing:0.18em;text-transform:uppercase;
+    font-weight:700;color:var(--dorado-hondo);margin-bottom:4px;
+  }
+  .nota.verde .et{color:var(--verde);}
+  .nota.rojo .et{color:var(--rojo);}
+
+  /* Tablas */
+  table{
+    width:100%;border-collapse:collapse;margin:18px 0;font-size:0.88rem;
+    background:#fff;border:1px solid var(--arena-borde);border-radius:8px;overflow:hidden;
+  }
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--arena-borde);vertical-align:top;}
+  th{background:var(--negro);color:var(--crema);font-weight:600;font-size:0.78rem;letter-spacing:0.03em;}
+  tr:last-child td{border-bottom:none;}
+  td:first-child{font-weight:600;color:var(--negro);}
+  .si{color:var(--verde);font-weight:700;}
+  .no{color:var(--gris);}
+  .permisos td,.permisos th{text-align:center;padding:8px 6px;font-size:0.8rem;}
+  .permisos td:first-child,.permisos th:first-child{text-align:left;font-size:0.82rem;}
+
+  /* Pasos numerados */
+  ol.pasos{counter-reset:p;list-style:none;padding:0;margin:16px 0;}
+  ol.pasos li{
+    counter-increment:p;position:relative;padding:0 0 14px 42px;margin:0;
+  }
+  ol.pasos li::before{
+    content:counter(p);position:absolute;left:0;top:-2px;
+    width:28px;height:28px;border-radius:50%;
+    background:var(--negro);color:var(--dorado);
+    font-family:"Cormorant Garamond",serif;font-weight:700;font-size:1.05rem;
+    display:flex;align-items:center;justify-content:center;
+  }
+  ol.pasos li::after{
+    content:"";position:absolute;left:13px;top:28px;bottom:2px;width:1px;background:var(--arena-borde);
+  }
+  ol.pasos li:last-child::after{display:none;}
+
+  .tipos{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:18px 0;}
+  .tipo{background:#fff;border:1px solid var(--arena-borde);border-radius:10px;padding:16px;}
+  .tipo .ico{font-size:1.6rem;}
+  .tipo h4{font-family:"Plus Jakarta Sans";font-size:0.95rem;font-weight:700;margin:8px 0 6px;color:var(--negro);}
+  .tipo p{font-size:0.82rem;color:var(--gris);margin:0;line-height:1.5;}
+
+  .pie{
+    background:var(--negro);color:#a59c89;
+    padding:32px 56px;font-size:0.82rem;
+    display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;
+  }
+  .pie strong{color:var(--dorado);font-weight:600;}
+  .pie .marca{font-family:"Cormorant Garamond",serif;font-size:1.3rem;color:var(--crema);}
+
+  @media (max-width:640px){
+    .portada{padding:56px 28px 48px;}
+    .portada::after{left:28px;right:28px;}
+    .portada h1{font-size:2.5rem;}
+    .cuerpo{padding:8px 28px 48px;}
+    .tipos{grid-template-columns:1fr;}
+    .seccion-num{font-size:2.4rem;}
+    .seccion-cabecera h2{font-size:1.6rem;}
+    .pie{padding:28px;}
+    table{font-size:0.8rem;}
+    th,td{padding:8px 10px;}
+    .permisos{display:block;overflow-x:auto;white-space:nowrap;}
+  }
+
+  @media print{
+    body{background:#fff;font-size:11.5pt;}
+    .hoja{box-shadow:none;max-width:none;}
+    .portada{padding:60px 48px;}
+    section.seccion{page-break-inside:auto;}
+    .seccion-cabecera{page-break-after:avoid;}
+    h3{page-break-after:avoid;}
+    table,.nota,.tipo,ol.pasos li{page-break-inside:avoid;}
+    .portada,.pie{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    a{color:var(--tinta);}
+  }
+</style>
+</head>
+<body>
+<div class="hoja">
+
+  <!-- PORTADA -->
+  <header class="portada">
+    <div class="sello">GG</div>
+    <div class="kicker">Green Garden · Sistema de Inventario</div>
+    <h1>Manual de <em>Usuario</em></h1>
+    <p class="sub">Todo lo que necesitás para manejar el stock del restaurante desde el celular o la computadora.</p>
+    <div class="meta">
+      <span><strong>Versión 3.8</strong>Junio 2026</span>
+      <span><strong>Martin Romero Studio</strong>Desarrollo</span>
+      <span><strong>control-stoks---green-garden.web.app</strong>Acceso</span>
+    </div>
+  </header>
+
+  <div class="cuerpo">
+
+    <!-- ÍNDICE -->
+    <nav class="indice">
+      <h2>Contenido</h2>
+      <ol>
+        <li>Cómo ingresar a la aplicación</li>
+        <li>Cómo funciona el inventario</li>
+        <li>Los movimientos</li>
+        <li>Recetas <span class="nuevo">Nuevo</span></li>
+        <li>Corregir el motivo de un movimiento <span class="nuevo">Nuevo</span></li>
+        <li>Roles y permisos</li>
+        <li>Guía del Gerente</li>
+        <li>Control de ventas cargadas</li>
+        <li>Buenas prácticas y preguntas frecuentes</li>
+      </ol>
+    </nav>
+
+    <!-- 1 -->
+    <section class="seccion">
+      <div class="seccion-cabecera">
+        <div class="seccion-num">1</div>
+        <div><h2>Cómo ingresar a la aplicación</h2>
+        <div class="lede">Funciona desde el navegador de cualquier celular, tablet o computadora. No hace falta instalar nada.</div></div>
+      </div>
+      <p>Dirección: <a href="https://control-stoks---green-garden.web.app">control-stoks---green-garden.web.app</a></p>
+
+      <h3><span class="n">1.1</span>Iniciar sesión</h3>
+      <p>Ingresá el correo y la contraseña que te asignó el gerente. Al entrar, la app te lleva directo a la pantalla de tu rol.</p>
+
+      <h3><span class="n">1.2</span>¿Olvidaste tu contraseña?</h3>
+      <p>Tocá “¿Olvidaste tu contraseña?” debajo del botón Ingresar, escribí tu correo y vas a recibir un email con un enlace para crear una nueva.</p>
+
+      <h3><span class="n">1.3</span>Acceso directo en el celular</h3>
+      <p>Para usarla como una app: abrí la dirección en Chrome, tocá el menú de tres puntos y elegí “Agregar a pantalla de inicio”. Queda el ícono como cualquier aplicación.</p>
+
+      <div class="nota">
+        <span class="et">Importante</span>
+        Nunca compartas tu contraseña. Cada movimiento queda registrado con tu nombre, y eso protege tanto al restaurante como a vos.
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section class="seccion">
+      <div class="seccion-cabecera">
+        <div class="seccion-num">2</div>
+        <div><h2>Cómo funciona el inventario</h2>
+        <div class="lede">Dos lugares donde vive el stock y tres tipos de producto.</div></div>
+      </div>
+
+      <h3><span class="n">2.1</span>Los dos lugares donde vive el stock</h3>
+      <ul>
+        <li><strong>Sector de Acopio</strong> (depósito, cámara de frío, bodega): donde se guarda la mercadería cuando ingresa.</li>
+        <li><strong>Sectores de Despacho</strong> (Barra, Cocina, Parrilla, etc.): los puntos operativos donde el producto queda listo para venderse o usarse.</li>
+      </ul>
+      <p>El <strong>stock total</strong> de un producto es la suma del acopio más todos sus despachos.</p>
+
+      <h3><span class="n">2.2</span>Los tres tipos de producto</h3>
+      <div class="tipos">
+        <div class="tipo">
+          <div class="ico">🥤</div>
+          <h4>Producto de despacho</h4>
+          <p>Se consume tal cual llega: gaseosas, vinos, cervezas, postres comprados. Tiene acopio + uno o más sectores de despacho, y se vende (descuenta del despacho).</p>
+        </div>
+        <div class="tipo">
+          <div class="ico">🌾</div>
+          <h4>Materia prima</h4>
+          <p>Se usa para elaborar: harina, carne cruda, salsas base. Solo tiene acopio. No se vende sola: se consume en producción.</p>
+        </div>
+        <div class="tipo">
+          <div class="ico">🍸</div>
+          <h4>Receta</h4>
+          <p>Se arma combinando otros productos: un gin tonic, una pinta. No tiene stock propio: al venderse descuenta sus ingredientes. (Ver sección 4.)</p>
+        </div>
+      </div>
+
+      <div class="nota">
+        <span class="et">Ejemplo</span>
+        La harina (materia prima) se retira del acopio y se consume haciendo pizzas. La pizza terminada se carga como <strong>Ingreso Producción</strong> de un producto nuevo “Pizza” (de despacho), y de ahí sigue el circuito normal hasta la venta.
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section class="seccion">
+      <div class="seccion-cabecera">
+        <div class="seccion-num">3</div>
+        <div><h2>Los movimientos</h2>
+        <div class="lede">Toda entrada, salida o corrección de stock queda registrada con tu nombre.</div></div>
+      </div>
+
+      <h3><span class="n">3.1</span>Entrada</h3>
+      <p>Registra mercadería que ingresa al acopio. Hay dos tipos:</p>
+      <ul>
+        <li><strong>Ingreso Proveedor:</strong> llegó mercadería comprada (el pedido de la distribuidora, el proveedor de carne).</li>
+        <li><strong>Ingreso Producción:</strong> un producto elaborado en el restaurante que entra al stock (pizzas, tartas, salsas listas).</li>
+      </ul>
+
+      <h3><span class="n">3.2</span>Retiro</h3>
+      <p>Saca mercadería del acopio. Lo que pasa después depende del motivo:</p>
+      <table>
+        <tr><th>Motivo</th><th>Qué hace</th></tr>
+        <tr><td>Reposición</td><td>Único motivo que <strong>transfiere</strong>: descuenta del acopio Y suma en el sector de despacho del producto. Usalo cuando llevás mercadería a la barra, la cocina, etc.</td></tr>
+        <tr><td>Retiro para uso</td><td>Solo descuenta del acopio. Para mercadería que se usa directamente.</td></tr>
+        <tr><td>Merma / Desperdicio</td><td>Solo descuenta. Producto que se tiró o desperdició.</td></tr>
+        <tr><td>Vencimiento</td><td>Solo descuenta. Producto vencido que se descarta.</td></tr>
+        <tr><td>Rotura</td><td>Solo descuenta. Botellas rotas, envases dañados.</td></tr>
+      </table>
+      <p>Antes de confirmar, la app te avisa: si el motivo es Reposición y el producto es de despacho, ves un cartel verde indicando a qué sector va el stock. Si tiene varios sectores, te pregunta a cuál. Para materias primas, el motivo Reposición no aparece.</p>
+
+      <h3><span class="n">3.3</span>Venta <span style="font-weight:400;color:var(--gris);font-size:0.85rem;">(Gerente y Administrador)</span></h3>
+      <p>Descuenta stock del sector de despacho donde se vendió. Solo aplica a productos de despacho y a recetas. Se carga de a una venta o de forma masiva importando un Excel (sección 7). Al cargar una venta se indica el período al que corresponde (sección 8).</p>
+
+      <h3><span class="n">3.4</span>Ajuste de Inventario <span style="font-weight:400;color:var(--gris);font-size:0.85rem;">(Gerente y Administrador)</span></h3>
+      <p>Corrige el stock a un número exacto después de un conteo. Hay dos formas:</p>
+      <ul>
+        <li><strong>Ajuste rápido:</strong> corrige un solo producto. Ahora elegís la <strong>ubicación</strong> a ajustar —Acopio o un sector de despacho— y ponés el valor real de ese lugar. La app te muestra el valor actual y reemplaza ese número exacto.</li>
+        <li><strong>Conteo físico:</strong> ajusta varios productos a la vez, tanto el acopio como cada sector de despacho. Ideal para el conteo de cierre.</li>
+      </ul>
+      <div class="nota verde">
+        <span class="et">Por qué elegir la ubicación</span>
+        El stock vive en baldes separados (acopio y cada despacho). Si el producto tiene unidades en la Barra y ajustás el Acopio, no se pisan entre sí. Por eso, al corregir, primero elegís dónde están las unidades que estás contando.
+      </div>
+      <p>El motivo es obligatorio y todo queda registrado en el historial con el valor anterior y el nuevo.</p>
+    </section>
+
+    <!-- 4 -->
+    <section class="seccion">
+      <div class="seccion-cabecera">
+        <div class="seccion-num">4</div>
+        <div><h2>Recetas</h2>
+        <div class="lede">Tragos y preparados que se arman con otros productos del inventario.</div></div>
+      </div>
+
+      <h3><span class="n">4.1</span>Qué es una receta</h3>
+      <p>Una receta es un producto que se vende pero <strong>no tiene stock propio</strong>: se compone de otros productos. Cuando vendés un gin tonic no baja stock de “gin tonic”, baja el gin y la tónica que lo forman. La app hace ese descuento sola.</p>
+
+      <h3><span class="n">4.2</span>Los ingredientes pueden ser cualquier producto</h3>
+      <p>Un ingrediente puede ser una <strong>materia prima</strong> (un barril, una botella de gin) o un <strong>producto de despacho</strong> que también vendés suelto (la tónica). No necesitás una versión aparte “para recetas”: la tónica del gin tonic sale del mismo stock de Barra que usás para venderla sola.</p>
+
+      <h3><span class="n">4.3</span>De dónde se descuentan</h3>
+      <p>Cada receta tiene un <strong>sector donde se arma</strong> (por ejemplo, Barra). Los ingredientes se descuentan del despacho de ese sector. Por eso conviene tener repuestos en la barra los productos que componen los tragos.</p>
+
+      <h3><span class="n">4.4</span>Variantes por tamaño</h3>
+      <p>A veces el mismo trago, con el mismo código, se vende en versiones distintas: un gin tonic <strong>Nacional</strong> (con un gin) y uno <strong>Importado</strong> (con otro). Activá la opción <strong>“Varía según tamaño”</strong> y cargá una variante por cada versión, cada una con sus propios ingredientes.</p>
+      <div class="nota">
+        <span class="et">Clave para que funcione</span>
+        El nombre del tamaño de cada variante (ej. NACIONAL / IMPORTADO) tiene que coincidir con lo que viene en la columna <strong>Tamaño</strong> del Excel de ventas. No importan mayúsculas ni espacios, pero sí el texto.
+      </div>
+
+      <h3><span class="n">4.5</span>Cómo crear una receta</h3>
+      <ol class="pasos">
+        <li>Asegurate de tener cargados los productos que la componen (el gin, la tónica, etc.).</li>
+        <li>Entrá a <strong>Productos → + Nuevo producto</strong> y elegí el tipo <strong>🍸 Receta</strong>.</li>
+        <li>Poné nombre, rubro y el <strong>código PLU</strong> con el que se vende (para que entre en la importación).</li>
+        <li>Elegí el <strong>sector donde se arma</strong> y agregá los ingredientes: elegís el producto, ponés la cantidad por unidad vendida y tocás “Agregar”.</li>
+        <li>Si varía por tamaño, activá la opción y repetí los ingredientes para cada variante.</li>
+        <li>Guardá. Al importar ventas de ese PLU, la app descuenta los ingredientes solos.</li>
+      </ol>
+      <div class="nota">
+        <span class="et">Sobre las cantidades</span>
+        La cantidad de cada ingrediente va en su propia unidad. Si el barril se mide en litros, una pinta es 0,5; si el gin está en mililitros, ponés 60.
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section class="seccion">
+      <div class="seccion-cabecera">
+        <div class="seccion-num">5</div>
+        <div><h2>Corregir el motivo de un movimiento</h2>
+        <div class="lede">Cuando un retiro se cargó con el motivo equivocado, se arregla sin inventar movimientos.</div></div>
+      </div>
+      <p>A veces se carga un retiro con un motivo que no era: por ejemplo, se pone <strong>Vencimiento</strong> a algo que en realidad fue una <strong>Reposición</strong> a la barra. El Gerente y el Administrador pueden corregirlo.</p>
+
+      <h3><span class="n">5.1</span>Cómo se hace</h3>
+      <ol class="pasos">
+        <li>En el historial (o en movimientos recientes), buscá el retiro y tocá el lápiz ✏️.</li>
+        <li>Elegí el motivo correcto. Si el nuevo motivo lleva a despacho y el producto tiene varios sectores, elegís a cuál.</li>
+        <li>La app te muestra un resumen de qué va a pasar con el stock.</li>
+        <li>Confirmás. El movimiento queda marcado como “corregido”, con el motivo anterior guardado.</li>
+      </ol>
+
+      <div class="nota verde">
+        <span class="et">Qué corrige automáticamente</span>
+        La app deshace el efecto del motivo viejo y aplica el nuevo. En el ejemplo Vencimiento → Reposición, las unidades vuelven al stock y aparecen en el sector de despacho. El acopio no cambia, porque en ambos casos ya había bajado igual.
+      </div>
+      <p>La corrección solo aparece en los retiros, que es donde tiene sentido.</p>
+    </section>
+
+    <!-- 6 -->
+    <section class="seccion">
+      <div class="seccion-cabecera">
+        <div class="seccion-num">6</div>
+        <div><h2>Roles y permisos</h2>
+        <div class="lede">Cada usuario tiene un rol que define qué puede hacer. Al iniciar sesión, la app te muestra directamente tu pantalla.</div></div>
+      </div>
+      <table class="permisos">
+        <tr><th>Función</th><th>Gerente</th><th>Admin.</th><th>Encargado</th><th>C. Entradas</th><th>C. Salidas</th></tr>
+        <tr><td>Ver stock completo</td><td class="si">Sí</td><td class="si">Sí</td><td class="si">Sí</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td>Registrar entradas</td><td class="si">Sí</td><td class="si">Sí</td><td class="si">Sí</td><td class="si">Sí</td><td class="no">—</td></tr>
+        <tr><td>Registrar retiros</td><td class="si">Sí</td><td class="si">Sí</td><td class="si">Sí</td><td class="no">—</td><td class="si">Sí</td></tr>
+        <tr><td>Registrar / importar ventas</td><td class="si">Sí</td><td class="si">Sí</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td>Ajuste y conteo físico</td><td class="si">Sí</td><td class="si">Sí</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td>Corregir motivo de retiro</td><td class="si">Sí</td><td class="si">Sí</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td>Historial completo + Excel</td><td class="si">Sí</td><td class="si">Sí</td><td class="si">Sí</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td>Crear / editar productos y recetas</td><td class="si">Sí</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td>Configurar sectores y motivos</td><td class="si">Sí</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td>Gestionar usuarios</td><td class="si">Sí</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+      </table>
+      <p><strong>Cargador de Entradas</strong> y <strong>Cargador de Salidas</strong> tienen un único formulario para su tarea y ven sus movimientos del día. El <strong>Encargado</strong> suma el inventario completo con filtros, alertas y el historial. El <strong>Administrador</strong> agrega ventas, importación y ajustes. El <strong>Gerente</strong> tiene control total en seis pestañas.</p>
+    </section>
+
+    <!-- 7 -->
+    <section class="seccion">
+      <div class="seccion-cabecera">
+        <div class="seccion-num">7</div>
+        <div><h2>Guía del Gerente</h2>
+        <div class="lede">Las tareas de configuración y control que solo maneja el gerente.</div></div>
+      </div>
+
+      <h3><span class="n">7.1</span>Crear un producto</h3>
+      <p>En <strong>Productos → + Nuevo producto</strong>, lo primero es elegir el <strong>tipo</strong> (Despacho, Materia prima o Receta): el formulario se adapta solo según lo que elijas. Completá nombre, rubro, sector de acopio y unidad. Si es de despacho, marcá a qué sectores puede ir. Opcionalmente, definí un stock mínimo para recibir alertas y un código PLU.</p>
+
+      <h3><span class="n">7.2</span>El código PLU</h3>
+      <p>El PLU es el número con el que tu software de gestión identifica cada producto (por ejemplo, 1203 para Coca Cola). Cargarlo en la app es lo que permite importar las ventas automáticamente. Es opcional: solo poné PLU a los productos que quieras controlar por importación.</p>
+      <div class="nota">
+        <span class="et">Consejo</span>
+        Empezá poniendo PLU solo a las bebidas (gaseosas, aguas, cervezas, vinos) y a las recetas que vendés. Podés ir sumando más con el tiempo. El que no tiene PLU, simplemente no entra en la importación.
+      </div>
+
+      <h3><span class="n">7.3</span>Importar ventas desde Excel</h3>
+      <p>En <strong>Movimientos → Importar ventas desde Excel</strong>:</p>
+      <ol class="pasos">
+        <li>Subí el archivo de consumos que genera tu software de gestión.</li>
+        <li>La app busca cada producto por su PLU y muestra una vista previa: cuántos descuenta, cuántos ignora (sin PLU), las cantidades y el período detectado.</li>
+        <li>Para productos con varios sectores, elegís de cuál descontar. Para recetas con variantes, la app usa la columna <strong>Tamaño</strong> del archivo para saber qué versión vendiste.</li>
+        <li>Confirmás y la app descuenta todo de una, registrando cada venta y actualizando la fecha de ventas de cada producto.</li>
+      </ol>
+      <div class="nota rojo">
+        <span class="et">Sobre el stock negativo</span>
+        Si un producto queda en negativo en el despacho después de importar, es una señal útil: se vendió mercadería que nunca se registró como repuesta al despacho. Revisá si faltó cargar una Reposición.
+      </div>
+
+      <h3><span class="n">7.4</span>Usuarios y motivos</h3>
+      <p>En <strong>Usuarios</strong> creás las cuentas del personal (nacen como Cargador Salidas; después editás el rol). En <strong>Config → Motivos de Salida</strong> podés crear motivos propios y decidir si suman al despacho o solo descuentan.</p>
+
+      <h3><span class="n">7.5</span>Exportar a Excel</h3>
+      <p>En <strong>Historial</strong>, aplicá los filtros que necesites y tocá <strong>Exportar a Excel</strong> para descargar todos los movimientos filtrados.</p>
+    </section>
+
+    <!-- 8 -->
+    <section class="seccion">
+      <div class="seccion-cabecera">
+        <div class="seccion-num">8</div>
+        <div><h2>Control de ventas cargadas</h2>
+        <div class="lede">La app lleva, por separado, hasta qué fecha están cargadas las ventas de cada producto.</div></div>
+      </div>
+      <p>Como varias personas pueden cargar ventas de distintos productos y períodos, sabés de un vistazo qué está al día y qué quedó atrasado.</p>
+
+      <h3><span class="n">8.1</span>La fecha de cada venta</h3>
+      <ul>
+        <li><strong>Por Excel:</strong> la app lee sola el período del reporte (la fila “Periodo:” del archivo) y usa la fecha final.</li>
+        <li><strong>Manual:</strong> el formulario te pide el período (desde / hasta). Viene con el día de hoy, pero lo podés cambiar.</li>
+      </ul>
+
+      <h3><span class="n">8.2</span>El resumen y el indicador por producto</h3>
+      <p>En la pestaña <strong>Stock</strong>, arriba, un panel muestra la fecha de venta más reciente y cuántos productos están atrasados. Cada producto de despacho muestra debajo su propia fecha: al día, atrasado, o sin ventas cargadas.</p>
+      <div class="nota">
+        <span class="et">Importante</span>
+        La fecha de un producto solo avanza, nunca retrocede. Si a la Coca ya le cargaste ventas hasta el 14, y después importás un reporte más viejo (hasta el 10), la fecha se mantiene en el 14. Esto evita perder ventas más nuevas.
+      </div>
+      <p>Las materias primas no se venden, así que no muestran fecha, no se marcan como atrasadas y no entran en el resumen.</p>
+    </section>
+
+    <!-- 9 -->
+    <section class="seccion">
+      <div class="seccion-cabecera">
+        <div class="seccion-num">9</div>
+        <div><h2>Buenas prácticas y preguntas frecuentes</h2>
+        <div class="lede">Lo que más consultan, y la forma correcta de resolverlo.</div></div>
+      </div>
+
+      <h3>¿Cuándo cargo los movimientos?</h3>
+      <p>En el momento en que pasan. Cargar “de memoria” al final del día es la principal causa de diferencias de stock.</p>
+
+      <h3>Me equivoqué en una carga</h3>
+      <p>Si fue el motivo de un retiro, el Gerente o Admin lo corrige con el lápiz ✏️ (sección 5). Si fue una cantidad, se arregla con un Ajuste de Inventario. No “compenses” con movimientos inventados.</p>
+
+      <h3>¿Por qué no me aparece el motivo Reposición?</h3>
+      <p>Porque el producto seleccionado es materia prima: no va a sectores de despacho.</p>
+
+      <h3>No puedo agregar ingredientes a una receta</h3>
+      <p>Primero elegí un producto en el desplegable “Agregar ingrediente” y después tocá Agregar. Si el desplegable está vacío, todavía no creaste los productos que la componen.</p>
+
+      <h3>Importé el Excel y faltan productos</h3>
+      <p>Esos productos no tienen el código PLU cargado, o no coincide con el del software. Verificá en Productos que el PLU sea exactamente el mismo.</p>
+
+      <h3>Un producto quedó en stock negativo</h3>
+      <p>Se vendió más de lo que figuraba en el despacho. Revisá si faltó registrar una reposición desde el acopio.</p>
+
+      <h3>Un producto aparece en rojo</h3>
+      <p>Está en o por debajo de su stock mínimo: hay que reponer o pedir al proveedor.</p>
+
+      <h3>¿Los cambios se ven al instante?</h3>
+      <p>Sí, el stock se actualiza en tiempo real en todos los dispositivos.</p>
+
+      <h3>No puedo iniciar sesión</h3>
+      <p>Verificá mayúsculas y espacios en el email. Si dice “cuenta desactivada”, hablá con el Gerente.</p>
+    </section>
+
+  </div>
+
+  <!-- PIE -->
+  <footer class="pie">
+    <div>
+      <div class="marca">Martin Romero Studio</div>
+      <div style="margin-top:4px;">Soporte técnico</div>
+    </div>
+    <div style="text-align:right;">
+      <div><strong>Web</strong> martinromerostudio.com.ar</div>
+      <div><strong>Email</strong> contacto@martinromerostudio.com.ar</div>
+      <div><strong>WhatsApp</strong> +54 9 221 435-8401</div>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>
