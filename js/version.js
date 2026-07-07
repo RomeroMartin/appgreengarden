@@ -7,13 +7,22 @@
 export const APP_VERSION = "3.8.7";
 
 function aplicarVersion() {
-  document.querySelectorAll(".app-version").forEach(el => {
+  // Fuente única del sello de versión. Si la página no trae un .app-version,
+  // lo creamos (así funciona en cualquier vista sin depender de un sello local).
+  let sellos = document.querySelectorAll(".app-version");
+  if (!sellos.length) {
+    const v = document.createElement("div");
+    v.className = "app-version";
+    (document.body || document.documentElement).appendChild(v);
+    sellos = [v];
+  }
+  sellos.forEach(el => {
     el.textContent = "v" + APP_VERSION;
     el.style.cssText =
       "position:fixed;bottom:8px;right:10px;" +
       "font:600 11px/1 ui-monospace,monospace;color:#9a7f43;" +
       "background:rgba(248,244,234,0.92);border:1px solid #ddd0b8;" +
-      "padding:3px 9px;border-radius:20px;z-index:9999;" +
+      "padding:3px 9px;border-radius:20px;z-index:99999;" +
       "pointer-events:none;letter-spacing:0.5px;box-shadow:0 1px 4px rgba(0,0,0,0.08);";
   });
 }

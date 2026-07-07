@@ -677,10 +677,4 @@ document.getElementById("btn-exportar-excel").addEventListener("click",async()=>
 function aDatetimeLocal(d){const p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;}
 function mostrarMsg(el,tipo,texto){el.textContent=texto;el.className=`msg show msg-${tipo==="error"?"error":"ok"}`;}
 
-// ── Sello de versión (autocontenido, no depende de version.js) ──
-(function () {
-  let v = document.querySelector(".app-version");
-  if (!v) { v = document.createElement("div"); (document.body || document.documentElement).appendChild(v); }
-  v.textContent = "v3.8.7";
-  v.style.cssText = "position:fixed;bottom:8px;right:10px;font:600 11px/1 ui-monospace,monospace;color:#9a7f43;background:rgba(248,244,234,0.92);border:1px solid #ddd0b8;padding:3px 9px;border-radius:20px;z-index:99999;pointer-events:none;letter-spacing:0.5px;box-shadow:0 1px 4px rgba(0,0,0,0.08);";
-})();
+// El sello de versión lo aplica js/version.js (cargado desde el HTML de la vista).

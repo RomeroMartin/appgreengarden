@@ -337,39 +337,35 @@ async function confirmarImportacion() {
     const porId = {};
     _productos.forEach(p => { porId[p.id] = p; });
 
-    // Batching por cantidad de operaciones (Firestore: máx 500 por batch).
-    // Una venta simple = 2 ops; una receta = 2 ops por ingrediente (+1 si avanza el corte).
-    const MAX_OPS = 450;
-    let batch = writeBatch(db);
-    let ops = 0;
+    // ── Paso A: acumular los deltas de stock por producto/sector y juntar los
+    // movimientos a registrar. Agregamos ANTES de escribir para que cada campo
+    // se toque UNA sola vez con un único increment → escritura atómica que no
+    // pisa cambios concurrentes ni se duplica cuando un producto aparece en
+    // varias filas del mismo Excel.
+    const stockDeltas = new Map();  // prodId -> Map(`stock_despacho.${sector}` -> deltaTotal)
+    const ventasHasta = new Map();  // prodId -> Date (corte a fijar)
+    const movs        = [];         // movimientos a crear (uno por línea, para el historial)
     let ventasProcesadas = 0;
     let ingredientesDescontados = 0;
 
-    const commitSiHaceFalta = async (proximas) => {
-      if (ops + proximas > MAX_OPS && ops > 0) {
-        await batch.commit();
-        batch = writeBatch(db);
-        ops = 0;
-      }
+    const sumarDelta = (prodId, campo, delta) => {
+      let m = stockDeltas.get(prodId);
+      if (!m) { m = new Map(); stockDeltas.set(prodId, m); }
+      m.set(campo, (m.get(campo) || 0) + delta);
     };
 
     for (const f of aDescontar) {
-      if (f.esReceta) {
-        // Calcular ops de esta receta antes de empezar (2 por ingrediente + 1 si avanza corte)
-        const avanza = _fechaCorte && debeAvanzar(f.prod.ventas_hasta, _fechaCorte);
-        await commitSiHaceFalta(f.ingredientes.length * 2 + (avanza ? 1 : 0));
+      const avanza = _fechaCorte && debeAvanzar(f.prod.ventas_hasta, _fechaCorte);
+      if (avanza) { ventasHasta.set(f.prod.id, _fechaCorte); f.prod.ventas_hasta = _fechaCorte; }
 
+      if (f.esReceta) {
         const sector = f.sectorReceta;
         for (const ing of f.ingredientes) {
           const materia = porId[ing.id];
           if (!materia) { console.warn(`Receta ${f.prod.nombre}: materia prima ${ing.id} no encontrada, se omite`); continue; }
-          const consumo     = ing.cantidad * f.cantidad;
-          const stockActual = materia.stock_despacho?.[sector] ?? 0;
-          const nuevoStock  = +(stockActual - consumo).toFixed(4); // permite negativo (señal de reposición pendiente)
-
-          batch.update(doc(db, "productos", materia.id), { [`stock_despacho.${sector}`]: nuevoStock });
-          const movRef = doc(collection(db, "movimientos"));
-          batch.set(movRef, {
+          const consumo = ing.cantidad * f.cantidad;
+          sumarDelta(materia.id, `stock_despacho.${sector}`, -consumo);
+          movs.push({
             fecha_hora: serverTimestamp(),
             id_usuario: _usuarioActual.uid || null,
             nombre_usuario: _usuarioActual.nombre,
@@ -382,38 +378,19 @@ async function confirmarImportacion() {
             origen: sector,
             destino: "salon"
           });
-          ops += 2;
-          // Copia local para coherencia entre filas del mismo import
+          // Copia local para coherencia inmediata del render (permite negativo)
           if (!materia.stock_despacho) materia.stock_despacho = {};
-          materia.stock_despacho[sector] = nuevoStock;
+          materia.stock_despacho[sector] = +((materia.stock_despacho[sector] ?? 0) - consumo).toFixed(4);
           ingredientesDescontados++;
-        }
-
-        // Avanzar el corte de la receta misma (para trazabilidad de ventas)
-        if (avanza) {
-          batch.update(doc(db, "productos", f.prod.id), { ventas_hasta: _fechaCorte });
-          f.prod.ventas_hasta = _fechaCorte;
-          ops += 1;
         }
         ventasProcesadas++;
         continue;
       }
 
       // ── Venta simple (despacho directo) ──
-      await commitSiHaceFalta(2);
       const sector = f.sectorElegido;
-      const stockActual = f.prod.stock_despacho?.[sector] ?? 0;
-      const nuevoStock = stockActual - f.cantidad;
-
-      const updateData = { [`stock_despacho.${sector}`]: nuevoStock };
-      if (_fechaCorte && debeAvanzar(f.prod.ventas_hasta, _fechaCorte)) {
-        updateData.ventas_hasta = _fechaCorte;
-        f.prod.ventas_hasta = _fechaCorte;
-      }
-      batch.update(doc(db, "productos", f.prod.id), updateData);
-
-      const movRef = doc(collection(db, "movimientos"));
-      batch.set(movRef, {
+      sumarDelta(f.prod.id, `stock_despacho.${sector}`, -f.cantidad);
+      movs.push({
         fecha_hora: serverTimestamp(),
         id_usuario: _usuarioActual.uid || null,
         nombre_usuario: _usuarioActual.nombre,
@@ -426,12 +403,39 @@ async function confirmarImportacion() {
         origen: sector,
         destino: "salon"
       });
-      ops += 2;
       if (!f.prod.stock_despacho) f.prod.stock_despacho = {};
-      f.prod.stock_despacho[sector] = nuevoStock;
+      f.prod.stock_despacho[sector] = +((f.prod.stock_despacho[sector] ?? 0) - f.cantidad).toFixed(4);
       ventasProcesadas++;
     }
 
+    // ── Paso B: un update por producto con sus increments + ventas_hasta.
+    const prodUpdates = [];
+    for (const prodId of new Set([...stockDeltas.keys(), ...ventasHasta.keys()])) {
+      const data = {};
+      const campos = stockDeltas.get(prodId);
+      if (campos) for (const [campo, delta] of campos) data[campo] = increment(+delta.toFixed(4));
+      if (ventasHasta.has(prodId)) data.ventas_hasta = ventasHasta.get(prodId);
+      prodUpdates.push({ id: prodId, data });
+    }
+
+    // ── Paso C: commitear en batches (Firestore: máx 500 ops por batch).
+    // Cada update de producto = 1 op; cada movimiento = 1 op.
+    const MAX_OPS = 450;
+    let batch = writeBatch(db);
+    let ops = 0;
+    const commitSiHaceFalta = async () => {
+      if (ops >= MAX_OPS) { await batch.commit(); batch = writeBatch(db); ops = 0; }
+    };
+    for (const u of prodUpdates) {
+      await commitSiHaceFalta();
+      batch.update(doc(db, "productos", u.id), u.data);
+      ops++;
+    }
+    for (const m of movs) {
+      await commitSiHaceFalta();
+      batch.set(doc(collection(db, "movimientos")), m);
+      ops++;
+    }
     if (ops > 0) await batch.commit();
 
     // Paso 3: resultado

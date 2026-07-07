@@ -66,12 +66,16 @@ export function protegerRuta(rolesPermitidos) {
 }
 
 // ── Redirigir si ya está logueado ────────────────────────────
-export function redirigirSiYaLogeado() {
+// onNoUser (opcional): se llama cuando Firebase confirma que NO hay sesión
+// activa, para revelar el login recién ahí (sin demoras artificiales) y sin
+// que parpadee el formulario cuando el usuario ya está logueado.
+export function redirigirSiYaLogeado(onNoUser) {
   onAuthStateChanged(auth, async (user) => {
-    if (!user) return;
+    if (!user) { if (onNoUser) onNoUser(); return; }
     const datos = await obtenerDatosUsuario(user.uid);
-    if (!datos || !datos.activo) return;
+    if (!datos || !datos.activo) { if (onNoUser) onNoUser(); return; }
     const ruta = RUTA_POR_ROL[datos.rol];
-    if (ruta) window.location.href = ruta;
+    if (ruta) { window.location.href = ruta; return; }
+    if (onNoUser) onNoUser();  // rol no reconocido → que vea el login igual
   });
 }
