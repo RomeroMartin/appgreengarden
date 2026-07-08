@@ -5,6 +5,7 @@
 
 import { auth, db } from "./firebase-config.js";
 import { protegerRuta, logout } from "./auth.js";
+import { escHtml } from "./core-inventario.js";
 import {
   collection, doc, addDoc, updateDoc, getDocs,
   query, orderBy, limit, where, serverTimestamp, increment
@@ -14,9 +15,6 @@ protegerRuta("Cargador Entradas");
 
 let productos     = [];
 let usuarioActual = null;
-
-// Escapa datos antes de inyectarlos por innerHTML (evita XSS via motivo/nombres).
-function escHtml(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 
 document.addEventListener("usuarioListo", async (e) => {
   usuarioActual = e.detail;

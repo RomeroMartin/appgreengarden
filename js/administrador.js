@@ -9,6 +9,10 @@ import { initImportador, abrirImportador, actualizarProductosImportador } from "
 import { renderResumen, badgeProducto, calcularResumen, debeAvanzar } from "./corte-ventas.js";
 import { initConteo, abrirConteo, setProductosConteo } from "./conteo-fisico.js";
 import {
+  escHtml, fmtN, esDespacho, sectoresDe, stockTotal, getBadge, acopioBajoOcero,
+  origenRetiroActual, aDatetimeLocal, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida
+} from "./core-inventario.js";
+import {
   collection, doc, addDoc, updateDoc, getDocs,
   onSnapshot, query, orderBy, limit, serverTimestamp, writeBatch, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -20,42 +24,7 @@ let movCache      = [];
 let movIndex      = {};   // id -> movimiento (para corregir motivo)
 let usuarioActual = null;
 
-function stockTotal(p) {
-  return (p.stock_deposito??0) + Object.values(p.stock_despacho??{}).reduce((a,b)=>a+(b||0),0);
-}
-
-function fmtN(n){const x=Number(n)||0;return +x.toFixed(2);}
-// Escapa datos antes de inyectarlos por innerHTML (evita XSS via motivo/nombres).
-function escHtml(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-function getBadge(p) {
-  const total=stockTotal(p),min=p.stock_minimo;
-  if(min==null||min==="")return null;
-  if(total<=0)return{cls:"critico",label:"Sin stock"};
-  if(total<=min)return{cls:"critico",label:"Bajo mínimo"};
-  return null;
-}
-function esDespacho(p){return p.tipo==="Despacho";}
-function sectoresDe(p){return p.sectores_asignados??[];}
-
-const MOTIVOS_SALIDA_DEFAULT=[
-  {nombre:"Retiro para uso",transfiere:false},
-  {nombre:"Merma / Desperdicio",transfiere:false},
-  {nombre:"Vencimiento",transfiere:false},
-  {nombre:"Rotura",transfiere:false},
-  {nombre:"Reposición",transfiere:true}
-];
-let motivosSalida=[...MOTIVOS_SALIDA_DEFAULT];
-
-function poblarMotivosSalida(){
-  const prod=productos.find(p=>p.id===document.getElementById("sal-producto")?.value);
-  const sel=document.getElementById("sal-motivo");
-  if(!sel)return;
-  const actual=sel.value;
-  const lista=(prod&&!esDespacho(prod))?motivosSalida.filter(m=>!m.transfiere):motivosSalida;
-  sel.innerHTML=lista.map(m=>`<option value="${m.nombre}">${m.nombre}</option>`).join("");
-  if(lista.some(m=>m.nombre===actual))sel.value=actual;
-  else if(lista.some(m=>m.nombre==="Reposición"))sel.value="Reposición";
-}
+let motivosSalida = [...MOTIVOS_SALIDA_DEFAULT];
 
 
 document.addEventListener("usuarioListo",(e)=>{
@@ -223,21 +192,9 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click",async(
 });
 
 // ── RETIRO INTELIGENTE v3.5 ───────────────────────────────────
-function acopioBajoOcero(p){
-  const dep=p.stock_deposito??0,min=p.stock_minimo;
-  if(dep<=0)return true;
-  if(min!=null&&min!==""&&dep<=min)return true;
-  return false;
-}
-function origenRetiroActual(){
-  const g=document.getElementById("sal-grupo-origen");
-  if(g&&g.style.display!=="none")return document.getElementById("sal-origen").value||"acopio";
-  return "acopio";
-}
-
 function actualizarInfoRetiro() {
   const prod=productos.find(p=>p.id===document.getElementById("sal-producto").value);
-  poblarMotivosSalida();
+  poblarMotivosSalida(productos, motivosSalida);
   const grupoSector=document.getElementById("sal-grupo-sector");
   const infoDestino=document.getElementById("sal-info-destino");
   const grupoOrigen=document.getElementById("sal-grupo-origen");
@@ -674,7 +631,6 @@ document.getElementById("btn-exportar-excel").addEventListener("click",async()=>
   btn.disabled=false;btn.textContent="📥 Exportar a Excel";
 });
 
-function aDatetimeLocal(d){const p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;}
 function mostrarMsg(el,tipo,texto){el.textContent=texto;el.className=`msg show msg-${tipo==="error"?"error":"ok"}`;}
 
 // El sello de versión lo aplica js/version.js (cargado desde el HTML de la vista).
