@@ -10,6 +10,10 @@ import { initImportador, abrirImportador, actualizarProductosImportador } from "
 import { renderResumen, badgeProducto, calcularResumen, debeAvanzar } from "./corte-ventas.js";
 import { initConteo, abrirConteo, setProductosConteo } from "./conteo-fisico.js";
 import {
+  escHtml, fmtN, esDespacho, esReceta, sectoresDe, stockTotal, getBadge, acopioBajoOcero,
+  origenRetiroActual, aDatetimeLocal, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida
+} from "./core-inventario.js";
+import {
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc,
   getDocs, onSnapshot, query, orderBy, limit, serverTimestamp, writeBatch, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -30,58 +34,13 @@ let movIndex          = {};   // id -> movimiento (para corregir motivo)
 let usuarioActual     = null;
 let confirmCallback   = null;
 
-// ── Helpers de stock v3 ───────────────────────────────────────
-function stockTotal(p) {
-  const dep = p.stock_deposito ?? 0;
-  const des = p.stock_despacho ?? {};
-  return dep + Object.values(des).reduce((a, b) => a + (b || 0), 0);
-}
-
-// Redondeo SOLO para mostrar: máx 2 decimales, sin ceros sobrantes.
-// El valor real guardado no se toca. (6 → 6, 1.4571 → 1.46, 1.5 → 1.5)
-function fmtN(n) {
-  const x = Number(n) || 0;
-  return +x.toFixed(2);
-}
-
-function getBadge(p) {
-  const total = stockTotal(p);
-  const min   = p.stock_minimo;
-  if (min == null || min === "") return null;
-  if (total <= 0)    return { cls: "critico", label: "Sin stock" };
-  if (total <= min)  return { cls: "critico", label: "Bajo mínimo" };
-  return null;
-}
-
-function esDespacho(p) { return p.tipo === "Despacho"; }
-function esReceta(p)   { return p.tipo === "Receta"; }
-function sectoresDe(p) { return p.sectores_asignados ?? []; }
-
 // Estado del editor de recetas
 function freshRecetaState() {
   return { porVariantes: false, simple: { sector: "", ingredientes: [] }, variantes: [] };
 }
 let recetaState = freshRecetaState();
 
-const MOTIVOS_SALIDA_DEFAULT = [
-  { nombre: "Retiro para uso", transfiere: false },
-  { nombre: "Merma / Desperdicio", transfiere: false },
-  { nombre: "Vencimiento", transfiere: false },
-  { nombre: "Rotura", transfiere: false },
-  { nombre: "Reposición", transfiere: true }
-];
 let motivosSalida = [...MOTIVOS_SALIDA_DEFAULT];
-
-function poblarMotivosSalida() {
-  const prod = productos.find(p => p.id === document.getElementById("sal-producto")?.value);
-  const sel = document.getElementById("sal-motivo");
-  if (!sel) return;
-  const actual = sel.value;
-  const lista = (prod && !esDespacho(prod)) ? motivosSalida.filter(m => !m.transfiere) : motivosSalida;
-  sel.innerHTML = lista.map(m => `<option value="${m.nombre}">${m.nombre}</option>`).join("");
-  if (lista.some(m => m.nombre === actual)) sel.value = actual;
-  else if (lista.some(m => m.nombre === "Reposición")) sel.value = "Reposición";
-}
 
 
 document.addEventListener("usuarioListo", (e) => {
@@ -406,9 +365,6 @@ document.getElementById("prod-receta-varia").addEventListener("change", function
 function optsSectores(sel) {
   if (!sectoresDespacho.length) return '<option value="">⚠️ Sin sectores de despacho</option>';
   return sectoresDespacho.map(s => `<option value="${s.nombre}" ${s.nombre===sel?"selected":""}>${s.nombre}</option>`).join("");
-}
-function escHtml(s) {
-  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 // Escapa un texto para meterlo dentro de un onclick="fn('...')" (string JS en atributo HTML).
 function escJs(s) {
@@ -852,28 +808,9 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click", async
 });
 
 // ── RETIRO INTELIGENTE v3.5 ───────────────────────────────────
-// Origen del retiro: por defecto "acopio". Cuando el acopio está en cero
-// o en/bajo el mínimo, se ofrece sacar desde un sector de despacho.
-function acopioBajoOcero(p) {
-  const dep = p.stock_deposito ?? 0;
-  const min = p.stock_minimo;
-  if (dep <= 0) return true;
-  if (min != null && min !== "" && dep <= min) return true;
-  return false;
-}
-
-// ¿Qué origen está elegido ahora mismo? "acopio" o nombre de un sector de despacho
-function origenRetiroActual() {
-  const grupo = document.getElementById("sal-grupo-origen");
-  if (grupo && grupo.style.display !== "none") {
-    return document.getElementById("sal-origen").value || "acopio";
-  }
-  return "acopio";
-}
-
 function actualizarInfoRetiro() {
   const prod = productos.find(p => p.id === document.getElementById("sal-producto").value);
-  poblarMotivosSalida();
+  poblarMotivosSalida(productos, motivosSalida);
   const grupoSector = document.getElementById("sal-grupo-sector");
   const infoDestino = document.getElementById("sal-info-destino");
   const grupoOrigen = document.getElementById("sal-grupo-origen");
@@ -1468,11 +1405,6 @@ document.getElementById("btn-confirm-ok").addEventListener("click", async () => 
   if (confirmCallback) { await confirmCallback(); confirmCallback = null; }
   cerrarModal("modal-confirm");
 });
-
-function aDatetimeLocal(d) {
-  const pad = n => String(n).padStart(2,"0");
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 function mostrarMsg(el, tipo, texto) {
   el.textContent = texto;

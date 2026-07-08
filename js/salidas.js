@@ -6,6 +6,10 @@
 import { auth, db } from "./firebase-config.js";
 import { protegerRuta, logout } from "./auth.js";
 import {
+  escHtml, fmtN, esDespacho, sectoresDe, acopioBajoOcero,
+  origenRetiroActual, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida
+} from "./core-inventario.js";
+import {
   collection, doc, addDoc, updateDoc, getDocs,
   query, orderBy, limit, where, serverTimestamp, writeBatch, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -15,33 +19,7 @@ protegerRuta("Cargador Salidas");
 let productos     = [];
 let usuarioActual = null;
 
-// Escapa datos antes de inyectarlos por innerHTML (evita XSS via motivo/nombres).
-function escHtml(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-function esDespacho(p){return p.tipo==="Despacho";}
-function sectoresDe(p){return p.sectores_asignados??[];}
-function fmtN(n){const x=Number(n)||0;return +x.toFixed(2);}
-function acopioBajoOcero(p){const dep=p.stock_deposito??0;const min=p.stock_minimo;if(dep<=0)return true;if(min!=null&&min!==""&&dep<=min)return true;return false;}
-function origenRetiroActual(){const g=document.getElementById("sal-grupo-origen");if(g&&g.style.display!=="none")return document.getElementById("sal-origen").value||"acopio";return "acopio";}
-
-const MOTIVOS_SALIDA_DEFAULT=[
-  {nombre:"Retiro para uso",transfiere:false},
-  {nombre:"Merma / Desperdicio",transfiere:false},
-  {nombre:"Vencimiento",transfiere:false},
-  {nombre:"Rotura",transfiere:false},
-  {nombre:"Reposición",transfiere:true}
-];
-let motivosSalida=[...MOTIVOS_SALIDA_DEFAULT];
-
-function poblarMotivosSalida(){
-  const prod=productos.find(p=>p.id===document.getElementById("sal-producto")?.value);
-  const sel=document.getElementById("sal-motivo");
-  if(!sel)return;
-  const actual=sel.value;
-  const lista=(prod&&!esDespacho(prod))?motivosSalida.filter(m=>!m.transfiere):motivosSalida;
-  sel.innerHTML=lista.map(m=>`<option value="${m.nombre}">${m.nombre}</option>`).join("");
-  if(lista.some(m=>m.nombre===actual))sel.value=actual;
-  else if(lista.some(m=>m.nombre==="Reposición"))sel.value="Reposición";
-}
+let motivosSalida = [...MOTIVOS_SALIDA_DEFAULT];
 
 
 document.addEventListener("usuarioListo", async (e) => {
@@ -96,7 +74,7 @@ function actualizarInfo() {
   info.style.display = "";
   document.getElementById("sal-stock-display").textContent = `${fmtN(prod.stock_deposito??0)} ${prod.unidad_medida}`;
   document.getElementById("sal-unidad").textContent = `(${prod.unidad_medida})`;
-  poblarMotivosSalida();
+  poblarMotivosSalida(productos, motivosSalida);
 
   // ── Selector de origen inteligente: cuando el acopio está sin stock pero hay en despacho ──
   let origenEsDespacho = false;
