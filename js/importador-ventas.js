@@ -8,7 +8,7 @@ import { auth, db } from "./firebase-config.js";
 import { debeAvanzar } from "./corte-ventas.js";
 import {
   collection, doc, addDoc, getDocs, query, orderBy,
-  serverTimestamp, writeBatch
+  serverTimestamp, writeBatch, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Estado interno del importador
