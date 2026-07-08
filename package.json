@@ -1,0 +1,9 @@
+{
+  "name": "green-garden-inventario",
+  "private": true,
+  "type": "module",
+  "description": "Sistema de inventario Green Garden (web app Firebase).",
+  "scripts": {
+    "test": "node --test"
+  }
+}
