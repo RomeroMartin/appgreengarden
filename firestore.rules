@@ -38,8 +38,13 @@ service cloud.firestore {
     match /usuarios/{userId} {
       allow read:   if request.auth != null && (request.auth.uid == userId || esGerente());
       allow create: if esGerente();
-      allow update: if esGerente();
-      allow delete: if esGerente();
+      // El Gerente administra a todos, pero NO puede cambiarse a sí mismo el rol
+      // ni desactivarse, ni borrarse (evita quedar sin acceso por accidente).
+      allow update: if esGerente()
+        && !(userId == request.auth.uid
+             && (request.resource.data.rol != resource.data.rol
+                 || request.resource.data.activo != resource.data.activo));
+      allow delete: if esGerente() && userId != request.auth.uid;
     }
 
     // ── CATÁLOGO (solo lo configura el Gerente) ──────────────────
@@ -68,7 +73,9 @@ service cloud.firestore {
     // Borrar = solo Gerente.
     match /movimientos/{id} {
       allow read:   if logueado();
-      allow create: if logueado();
+      // El movimiento debe quedar registrado a nombre del usuario que lo crea
+      // (nadie puede falsificar el autor de una operación).
+      allow create: if logueado() && request.resource.data.id_usuario == request.auth.uid;
       allow update: if gerenteOAdmin();
       allow delete: if esGerente();
     }

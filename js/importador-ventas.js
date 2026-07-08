@@ -4,7 +4,7 @@
 // Compartido entre Gerente y Administrador.
 // ============================================================
 
-import { db } from "./firebase-config.js";
+import { auth, db } from "./firebase-config.js";
 import { debeAvanzar } from "./corte-ventas.js";
 import {
   collection, doc, addDoc, getDocs, query, orderBy,
@@ -367,7 +367,7 @@ async function confirmarImportacion() {
           sumarDelta(materia.id, `stock_despacho.${sector}`, -consumo);
           movs.push({
             fecha_hora: serverTimestamp(),
-            id_usuario: _usuarioActual.uid || null,
+            id_usuario: auth.currentUser?.uid || null,
             nombre_usuario: _usuarioActual.nombre,
             id_producto: materia.id,
             nombre_producto: materia.nombre,
@@ -392,7 +392,7 @@ async function confirmarImportacion() {
       sumarDelta(f.prod.id, `stock_despacho.${sector}`, -f.cantidad);
       movs.push({
         fecha_hora: serverTimestamp(),
-        id_usuario: _usuarioActual.uid || null,
+        id_usuario: auth.currentUser?.uid || null,
         nombre_usuario: _usuarioActual.nombre,
         id_producto: f.prod.id,
         nombre_producto: f.prod.nombre,

@@ -4,7 +4,7 @@
 // Usado por Gerente y Administrador desde dentro de la app.
 // ============================================================
 
-import { db } from "./firebase-config.js";
+import { auth, db } from "./firebase-config.js";
 import {
   collection, doc, getDocs, updateDoc, addDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -114,7 +114,7 @@ async function aplicar() {
         update.stock_deposito = c.acopio;
         if (c.acopio !== anterior) {
           await addDoc(collection(db, "movimientos"), {
-            fecha_hora: serverTimestamp(), id_usuario: _usuarioActual.uid || null,
+            fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
             nombre_usuario: _usuarioActual.nombre, id_producto: id, nombre_producto: prod.nombre,
             tipo: "AJUSTE", cantidad: Math.abs(c.acopio - anterior), unidad: prod.unidad_medida,
             motivo: `Conteo físico (${anterior} → ${c.acopio})`, origen: "acopio", destino: "acopio"
@@ -128,7 +128,7 @@ async function aplicar() {
           nuevoDesp[s] = c.despacho[s];
           if (c.despacho[s] !== anterior) {
             await addDoc(collection(db, "movimientos"), {
-              fecha_hora: serverTimestamp(), id_usuario: _usuarioActual.uid || null,
+              fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
               nombre_usuario: _usuarioActual.nombre, id_producto: id, nombre_producto: prod.nombre,
               tipo: "AJUSTE", cantidad: Math.abs(c.despacho[s] - anterior), unidad: prod.unidad_medida,
               motivo: `Conteo físico ${s} (${anterior} → ${c.despacho[s]})`, origen: s, destino: s
