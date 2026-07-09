@@ -448,8 +448,8 @@ function filaMov(m){
   const color=COLORES_MOV[m.tipo]||"var(--texto-2)";
   const label=LABELS_MOV[m.tipo]||escHtml(m.tipo);
   const destinoExtra=(m.tipo==="RETIRO"&&m.destino&&m.destino!=="produccion"&&m.destino!=="consumo")?` → ${escHtml(m.destino)}`:"";
-  const corregido=m.corregido?' <span style="font-size:0.62rem;background:var(--bg-secondary);color:var(--texto-3);padding:1px 6px;border-radius:5px;">✏️ corregido</span>':"";
-  const btnEditar=(m.tipo==="RETIRO"&&m.id)?`<button class="btn-icono" onclick="abrirEditarMotivo('${m.id}')" title="Corregir motivo" style="padding:2px 7px;">✏️</button>`:"";
+  const corregido=m.corregido?` <span style="font-size:0.62rem;background:var(--bg-secondary);color:var(--texto-3);padding:1px 6px;border-radius:5px;display:inline-flex;align-items:center;gap:3px;">${icono("editar",{size:10})} corregido</span>`:"";
+  const btnEditar=(m.tipo==="RETIRO"&&m.id)?`<button class="btn-icono" onclick="abrirEditarMotivo('${m.id}')" title="Corregir motivo" style="padding:2px 7px;">${icono("editar",{size:16})}</button>`:"";
   return `<div class="mov-row"><div class="mov-header"><span class="mov-producto">${escHtml(m.nombre_producto||"—")}</span><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:0.85rem;font-weight:700;color:${color};">${escHtml(m.cantidad)} ${escHtml(m.unidad||"")}</span>${btnEditar}</div></div><div class="mov-meta">${fecha} ${hora} · <span style="color:${color};font-weight:600;">${label}${destinoExtra}</span> · ${escHtml(m.nombre_usuario||"—")} · ${escHtml(m.motivo||"")}${corregido}</div></div>`;
 }
 

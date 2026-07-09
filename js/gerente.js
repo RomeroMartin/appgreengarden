@@ -91,7 +91,7 @@ function renderRubros() {
   if (!rubros.length) { cont.innerHTML = '<p class="empty-state">Sin rubros.</p>'; return; }
   cont.innerHTML = rubros.map(r => `
     <div class="config-item"><span>${escHtml(r.nombre)}</span>
-      <button class="btn-icono danger" onclick="eliminarItem('rubros','${r.id}','${escJs(r.nombre)}')">🗑</button>
+      <button class="btn-icono danger" onclick="eliminarItem('rubros','${r.id}','${escJs(r.nombre)}')">${icono("eliminar",{size:16})}</button>
     </div>`).join("");
 }
 
@@ -121,7 +121,7 @@ function renderSectores() {
   if (!sectores.length) { cont.innerHTML = '<p class="empty-state">Sin sectores.</p>'; return; }
   cont.innerHTML = sectores.map(s => `
     <div class="config-item"><span>${escHtml(s.nombre)}</span>
-      <button class="btn-icono danger" onclick="eliminarItem('sectores','${s.id}','${escJs(s.nombre)}')">🗑</button>
+      <button class="btn-icono danger" onclick="eliminarItem('sectores','${s.id}','${escJs(s.nombre)}')">${icono("eliminar",{size:16})}</button>
     </div>`).join("");
 }
 
@@ -151,7 +151,7 @@ function renderSectoresDespacho() {
   if (!sectoresDespacho.length) { cont.innerHTML = '<p class="empty-state">Sin sectores de despacho.</p>'; return; }
   cont.innerHTML = sectoresDespacho.map(s => `
     <div class="config-item"><span>${escHtml(s.nombre)}</span>
-      <button class="btn-icono danger" onclick="eliminarItem('sectores_despacho','${s.id}','${escJs(s.nombre)}')">🗑</button>
+      <button class="btn-icono danger" onclick="eliminarItem('sectores_despacho','${s.id}','${escJs(s.nombre)}')">${icono("eliminar",{size:16})}</button>
     </div>`).join("");
 }
 
@@ -201,7 +201,7 @@ function renderMotivosSalida() {
   cont.innerHTML = motivosSalida.map(m => `
     <div class="config-item">
       <span>${escHtml(m.nombre)} ${m.transfiere ? '<span style="font-size:0.65rem;background:var(--verde-claro);color:var(--verde);padding:2px 8px;border-radius:10px;font-weight:600;">→ despacho</span>' : ""}</span>
-      ${m.id ? `<button class="btn-icono danger" onclick="eliminarItem('motivos_salida','${m.id}','${escJs(m.nombre)}')">🗑</button>` : ""}
+      ${m.id ? `<button class="btn-icono danger" onclick="eliminarItem('motivos_salida','${m.id}','${escJs(m.nombre)}')">${icono("eliminar",{size:16})}</button>` : ""}
     </div>`).join("");
 }
 
@@ -321,8 +321,8 @@ function renderProductos() {
         <div class="item-meta">${escHtml(detalle)}</div>
       </div>
       <div style="display:flex;gap:6px;">
-        <button class="btn-icono" onclick="abrirEditarProducto('${p.id}')">✏️</button>
-        <button class="btn-icono danger" onclick="eliminarItem('productos','${p.id}','${escJs(p.nombre)}')">🗑</button>
+        <button class="btn-icono" onclick="abrirEditarProducto('${p.id}')">${icono("editar",{size:16})}</button>
+        <button class="btn-icono danger" onclick="eliminarItem('productos','${p.id}','${escJs(p.nombre)}')">${icono("eliminar",{size:16})}</button>
       </div>
     </div>`;
   }).join("");
@@ -422,7 +422,7 @@ function bloqueIngredientesHTML(target, sector, ingredientes, conSector = true) 
         return `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;${i>0?'border-top:1px solid var(--borde);':''}">
           <span style="font-size:0.83rem;">${disp.replace(/^(\S+)/, '<strong>$1</strong>')} de ${escHtml(ing.nombre)}${conv}</span>
-          <button type="button" class="btn-icono danger" data-action="del-ing" data-target="${target}" data-idx="${i}" style="padding:2px 7px;">🗑</button>
+          <button type="button" class="btn-icono danger" data-action="del-ing" data-target="${target}" data-idx="${i}" style="padding:2px 7px;">${icono("eliminar",{size:16})}</button>
         </div>`;
       }).join("")
     : '<p style="font-size:0.76rem;color:var(--texto-3);margin:0;">Sin ingredientes.</p>';
@@ -461,7 +461,7 @@ function renderRecetaEditor() {
     <div class="receta-bloque" style="border:1px solid var(--borde);border-radius:10px;padding:10px 12px;margin-top:8px;background:var(--bg-secondary);">
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
         <input class="form-control variante-tamano" data-idx="${idx}" placeholder="Tamaño (ej. NACIONAL)" value="${(v.tamano||'').replace(/"/g,'&quot;')}" style="font-size:0.85rem;flex:1;" />
-        <button type="button" class="btn-icono danger" data-action="del-var" data-idx="${idx}" style="padding:4px 9px;">🗑</button>
+        <button type="button" class="btn-icono danger" data-action="del-var" data-idx="${idx}" style="padding:4px 9px;">${icono("eliminar",{size:16})}</button>
       </div>
       ${bloqueIngredientesHTML(String(idx), v.sector, v.ingredientes)}
     </div>`).join("");
@@ -1061,8 +1061,8 @@ function filaMovimiento(m) {
   const color = COLORES_MOV[m.tipo] || "var(--texto-2)";
   const label = LABELS_MOV[m.tipo]  || escHtml(m.tipo);
   const destinoExtra = (m.tipo === "RETIRO" && m.destino && m.destino !== "produccion" && m.destino !== "consumo") ? ` → ${escHtml(m.destino)}` : "";
-  const corregido = m.corregido ? ' <span style="font-size:0.62rem;background:var(--bg-secondary);color:var(--texto-3);padding:1px 6px;border-radius:5px;">✏️ corregido</span>' : "";
-  const btnEditar = (m.tipo === "RETIRO" && m.id) ? `<button class="btn-icono" onclick="abrirEditarMotivo('${m.id}')" title="Corregir motivo" style="padding:2px 7px;">✏️</button>` : "";
+  const corregido = m.corregido ? ` <span style="font-size:0.62rem;background:var(--bg-secondary);color:var(--texto-3);padding:1px 6px;border-radius:5px;display:inline-flex;align-items:center;gap:3px;">${icono("editar",{size:10})} corregido</span>` : "";
+  const btnEditar = (m.tipo === "RETIRO" && m.id) ? `<button class="btn-icono" onclick="abrirEditarMotivo('${m.id}')" title="Corregir motivo" style="padding:2px 7px;">${icono("editar",{size:16})}</button>` : "";
   return `<div class="mov-row">
     <div class="mov-header">
       <span class="mov-producto">${escHtml(m.nombre_producto||"—")}</span>
@@ -1258,7 +1258,7 @@ function renderUsuarios(usuarios) {
         <span class="badge badge-entrada" style="margin-top:4px;display:inline-block;">${escHtml(u.rol)}</span>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
-        <button class="btn-icono" onclick="abrirEditarUsuario('${u.id}')">✏️</button>
+        <button class="btn-icono" onclick="abrirEditarUsuario('${u.id}')">${icono("editar",{size:16})}</button>
         <div class="toggle ${u.activo?"on":""}" onclick="toggleUsuario('${u.id}',${u.activo})"></div>
       </div>
     </div>`;
