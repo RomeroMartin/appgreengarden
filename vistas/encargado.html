@@ -46,14 +46,14 @@
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" data-tab="inventario">📦 Inventario</button>
-      <button class="tab-btn" data-tab="movimientos">🔄 Movimientos</button>
+      <button class="tab-btn active" data-tab="inventario"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M12 3.2 4.2 7.4a1 1 0 0 0-.5.9v7.4a1 1 0 0 0 .5.9L12 20.8l7.8-4.2a1 1 0 0 0 .5-.9V8.3a1 1 0 0 0-.5-.9L12 3.2Z"/><path d="M4 7.8 12 12l8-4.2"/><path d="M12 12v8.6"/></svg>Inventario</button>
+      <button class="tab-btn" data-tab="movimientos"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M3.5 12H7l2.5 6.5a.6.6 0 0 0 1.1 0L14 5a.6.6 0 0 1 1.1 0l2 7h3.4"/></svg>Movimientos</button>
     </div>
 
     <div class="tab-content active" id="tab-inventario">
       <div id="seccion-alertas" style="display:none;margin-bottom:14px;">
         <div style="background:var(--critico-bg);border:1px solid #F5C6C5;border-radius:var(--radio);padding:14px 16px;">
-          <p style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--critico-txt);margin-bottom:10px;">⚠️ Productos bajo mínimo</p>
+          <p style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--critico-txt);margin-bottom:10px;display:flex;align-items:center;gap:5px;"><svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 4 3 17.5a1.6 1.6 0 0 0 1.4 2.4h15.2a1.6 1.6 0 0 0 1.4-2.4L13.4 4a1.6 1.6 0 0 0-2.8 0Z"/><path d="M12 9.5v4"/><path d="M12 17h.01"/></svg>Productos bajo mínimo</p>
           <div id="lista-alertas"></div>
         </div>
       </div>
@@ -81,7 +81,7 @@
           <button class="btn btn-secondary btn-sm" id="btn-limpiar-mov" style="width:100%;color:var(--texto-3);">Limpiar</button>
         </div>
       </div>
-      <button class="btn btn-secondary" id="btn-exportar-excel-enc" style="margin-bottom:14px;border-color:var(--verde);color:var(--verde);">📥 Exportar a Excel</button>
+      <button class="btn btn-secondary" id="btn-exportar-excel-enc" style="margin-bottom:14px;border-color:var(--verde);color:var(--verde);"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/><path d="M12 14V3.5"/><path d="M8.5 7 12 3.5 15.5 7"/></svg>Exportar a Excel</button>
       <div class="card" style="padding:0 20px;"><div id="lista-movimientos"><div class="empty-state"><div class="spinner spinner-verde"></div></div></div></div>
     </div>
   </div>

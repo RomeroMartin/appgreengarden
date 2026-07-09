@@ -77,12 +77,12 @@
     </header>
 
     <div class="tabs tabs-wrap">
-      <button class="tab-btn active" data-tab="stock">📦 Stock</button>
-      <button class="tab-btn" data-tab="movimientos">🔄 Movimientos</button>
-      <button class="tab-btn" data-tab="productos">🥩 Productos</button>
-      <button class="tab-btn" data-tab="config">⚙️ Config</button>
-      <button class="tab-btn" data-tab="usuarios">👥 Usuarios</button>
-      <button class="tab-btn" data-tab="historial">📋 Historial</button>
+      <button class="tab-btn active" data-tab="stock"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M12 3.2 4.2 7.4a1 1 0 0 0-.5.9v7.4a1 1 0 0 0 .5.9L12 20.8l7.8-4.2a1 1 0 0 0 .5-.9V8.3a1 1 0 0 0-.5-.9L12 3.2Z"/><path d="M4 7.8 12 12l8-4.2"/><path d="M12 12v8.6"/></svg>Stock</button>
+      <button class="tab-btn" data-tab="movimientos"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M3.5 12H7l2.5 6.5a.6.6 0 0 0 1.1 0L14 5a.6.6 0 0 1 1.1 0l2 7h3.4"/></svg>Movimientos</button>
+      <button class="tab-btn" data-tab="productos"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M3.6 12.4 12 4a2 2 0 0 1 1.4-.6l4.6.1a2 2 0 0 1 2 2l.1 4.6a2 2 0 0 1-.6 1.4l-8.4 8.4a2 2 0 0 1-2.8 0l-4.3-4.3a2 2 0 0 1 0-2.8Z"/><circle cx="16" cy="8" r="1.3"/></svg>Productos</button>
+      <button class="tab-btn" data-tab="config"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M12 3.3 19.5 7.6v8.8L12 20.7 4.5 16.4V7.6Z"/><circle cx="12" cy="12" r="3.2"/></svg>Config</button>
+      <button class="tab-btn" data-tab="usuarios"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M15.5 20.5v-1.5a3.5 3.5 0 0 0-3.5-3.5H7a3.5 3.5 0 0 0-3.5 3.5v1.5"/><circle cx="9.5" cy="8" r="3.5"/><path d="M20.5 20.5v-1.5a3.5 3.5 0 0 0-2.6-3.4"/><path d="M15.5 4.6a3.5 3.5 0 0 1 0 6.8"/></svg>Usuarios</button>
+      <button class="tab-btn" data-tab="historial"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><circle cx="4.5" cy="6" r="1.1"/><circle cx="4.5" cy="12" r="1.1"/><circle cx="4.5" cy="18" r="1.1"/></svg>Historial</button>
     </div>
 
     <!-- TAB STOCK -->
@@ -91,7 +91,7 @@
       <div id="seccion-alertas" style="display:none;margin-bottom:14px;">
         <div style="background:var(--critico-bg);border:1px solid #F5C6C5;border-radius:var(--radio);padding:14px 16px;">
           <div id="alertas-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;">
-            <p style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--critico-txt);margin:0;">⚠️ Productos bajo mínimo <span id="alertas-count"></span></p>
+            <p style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--critico-txt);margin:0;"><svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.15em;margin-right:5px"><path d="M10.6 4 3 17.5a1.6 1.6 0 0 0 1.4 2.4h15.2a1.6 1.6 0 0 0 1.4-2.4L13.4 4a1.6 1.6 0 0 0-2.8 0Z"/><path d="M12 9.5v4"/><path d="M12 17h.01"/></svg>Productos bajo mínimo <span id="alertas-count"></span></p>
             <span id="alertas-chevron" style="color:var(--critico-txt);font-size:0.8rem;transition:transform .2s;">▼</span>
           </div>
           <div id="lista-alertas" style="margin-top:10px;display:none;"></div>
@@ -115,7 +115,7 @@
       <div id="pantalla-conteo" style="display:none;">
         <button class="btn btn-secondary btn-sm" id="conteo-btn-volver" style="margin-bottom:14px;">← Volver a Movimientos</button>
         <div class="card">
-          <p class="card-title">📋 Conteo Físico</p>
+          <p class="card-title"><svg class="ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.16em;margin-right:5px"><path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><circle cx="4.5" cy="6" r="1.1"/><circle cx="4.5" cy="12" r="1.1"/><circle cx="4.5" cy="18" r="1.1"/></svg>Conteo Físico</p>
           <p style="font-size:0.82rem;color:var(--texto-3);margin-bottom:12px;">Escribí las cantidades reales que contaste. Lo que dejes vacío no se toca. El stock queda igual a tu conteo.</p>
           <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
             <select class="form-control" id="conteo-filtro-rubro" style="flex:1;min-width:140px;font-size:0.85rem;padding:9px;"><option value="">Todos los rubros</option></select>
@@ -143,9 +143,9 @@
         <button class="btn btn-primary" id="btn-mov-entrada">↑ Entrada</button>
         <button class="btn btn-secondary" id="btn-mov-salida" style="border-color:#F5C6C5;color:var(--critico-txt);">↓ Salida</button>
       </div>
-      <button class="btn btn-secondary" id="btn-mov-venta" style="margin-bottom:10px;border-color:var(--verde);color:var(--verde);">💰 Registrar Venta</button>
-      <button class="btn btn-secondary" id="btn-mov-ajuste" style="margin-bottom:10px;border-color:var(--texto-3);color:var(--texto-3);">⚖️ Ajuste de Inventario</button>
-      <button class="btn btn-secondary" id="btn-mov-importar" style="margin-bottom:20px;border-color:var(--verde);color:var(--verde);">📥 Importar ventas desde Excel</button>
+      <button class="btn btn-secondary" id="btn-mov-venta" style="margin-bottom:10px;border-color:var(--verde);color:var(--verde);"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:5px"><path d="M4.5 6.5h15a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 16V8a1.5 1.5 0 0 1 1.5-1.5Z"/><circle cx="12" cy="12" r="2.4"/><path d="M6.5 10v4"/><path d="M17.5 10v4"/></svg>Registrar Venta</button>
+      <button class="btn btn-secondary" id="btn-mov-ajuste" style="margin-bottom:10px;border-color:var(--texto-3);color:var(--texto-3);"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:5px"><path d="M4 8h8"/><path d="M17 8h3"/><circle cx="14.5" cy="8" r="2.3"/><path d="M4 16h4"/><path d="M13 16h7"/><circle cx="10.5" cy="16" r="2.3"/></svg>Ajuste de Inventario</button>
+      <button class="btn btn-secondary" id="btn-mov-importar" style="margin-bottom:20px;border-color:var(--verde);color:var(--verde);"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:5px"><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/><path d="M12 3.5v10.5"/><path d="M8.5 10.5 12 14l3.5-3.5"/></svg>Importar ventas desde Excel</button>
       <div class="card" style="padding:0 20px;">
         <p style="padding:14px 0 10px;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--texto-3);">Últimos movimientos</p>
         <div id="lista-mov-recientes"><div class="empty-state"><div class="spinner spinner-verde"></div></div></div>
@@ -245,7 +245,7 @@
           <button class="btn btn-secondary btn-sm" id="btn-limpiar-filtros" style="width:100%;color:var(--texto-3);">Limpiar</button>
         </div>
       </div>
-      <button class="btn btn-secondary" id="btn-exportar-excel" style="margin-bottom:14px;border-color:var(--verde);color:var(--verde);">📥 Exportar a Excel</button>
+      <button class="btn btn-secondary" id="btn-exportar-excel" style="margin-bottom:14px;border-color:var(--verde);color:var(--verde);"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:5px"><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/><path d="M12 14V3.5"/><path d="M8.5 7 12 3.5 15.5 7"/></svg>Exportar a Excel</button>
       <div class="card" style="padding:0 20px;">
         <div id="lista-historial"><div class="empty-state"><div class="spinner spinner-verde"></div></div></div>
       </div>
@@ -385,7 +385,7 @@
   <div class="modal-overlay" id="modal-venta">
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-titulo">💰 Registrar Venta</span>
+        <span class="modal-titulo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.2em;margin-right:6px"><path d="M4.5 6.5h15a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 16V8a1.5 1.5 0 0 1 1.5-1.5Z"/><circle cx="12" cy="12" r="2.4"/><path d="M6.5 10v4"/><path d="M17.5 10v4"/></svg>Registrar Venta</span>
         <button class="btn-cerrar-modal" data-cerrar="modal-venta">×</button>
       </div>
       <div class="form-group"><label class="form-label">Buscar producto</label><input class="form-control" type="search" id="vta-busqueda" placeholder="Escribí el nombre..." /></div>
@@ -410,7 +410,7 @@
   <!-- MODAL AJUSTE -->
   <div class="modal-overlay" id="modal-ajuste">
     <div class="modal">
-      <div class="modal-header"><span class="modal-titulo">⚖️ Ajuste de Inventario</span><button class="btn-cerrar-modal" data-cerrar="modal-ajuste">×</button></div>
+      <div class="modal-header"><span class="modal-titulo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.2em;margin-right:6px"><path d="M4 8h8"/><path d="M17 8h3"/><circle cx="14.5" cy="8" r="2.3"/><path d="M4 16h4"/><path d="M13 16h7"/><circle cx="10.5" cy="16" r="2.3"/></svg>Ajuste de Inventario</span><button class="btn-cerrar-modal" data-cerrar="modal-ajuste">×</button></div>
       <div class="form-group"><label class="form-label">Buscar producto</label><input class="form-control" type="search" id="ajt-busqueda" placeholder="Escribí el nombre..." /></div>
       <div class="form-group"><label class="form-label">Producto</label><select class="form-control" id="ajt-producto"></select></div>
       <div class="form-group"><label class="form-label">Ubicación a ajustar</label><select class="form-control" id="ajt-ubicacion"></select></div>
@@ -425,7 +425,7 @@
   <div class="modal-overlay" id="modal-confirm">
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-titulo">⚠️ Confirmar eliminación</span>
+        <span class="modal-titulo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.2em;margin-right:6px"><path d="M10.6 4 3 17.5a1.6 1.6 0 0 0 1.4 2.4h15.2a1.6 1.6 0 0 0 1.4-2.4L13.4 4a1.6 1.6 0 0 0-2.8 0Z"/><path d="M12 9.5v4"/><path d="M12 17h.01"/></svg>Confirmar eliminación</span>
         <button class="btn-cerrar-modal" data-cerrar="modal-confirm">×</button>
       </div>
       <p style="color:var(--texto-2);font-size:0.9rem;margin-bottom:20px;" id="confirm-texto"></p>
@@ -440,13 +440,13 @@
   <!-- MODAL IMPORTAR VENTAS -->
   <div class="modal-overlay" id="modal-importar">
     <div class="modal" style="max-width:560px;">
-      <div class="modal-header"><span class="modal-titulo">📥 Importar ventas desde Excel</span><button class="btn-cerrar-modal" data-cerrar="modal-importar">×</button></div>
+      <div class="modal-header"><span class="modal-titulo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.2em;margin-right:6px"><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/><path d="M12 3.5v10.5"/><path d="M8.5 10.5 12 14l3.5-3.5"/></svg>Importar ventas desde Excel</span><button class="btn-cerrar-modal" data-cerrar="modal-importar">×</button></div>
 
       <!-- Paso 1: subir archivo -->
       <div id="import-paso-1">
         <p style="font-size:0.85rem;color:var(--texto-2);margin-bottom:14px;">Subí el archivo de consumos que genera tu software de gestión. La app va a buscar cada producto por su <b>código PLU</b> y te va a mostrar una vista previa antes de descontar nada.</p>
         <label for="import-file" class="btn btn-secondary" style="cursor:pointer;display:block;text-align:center;border-style:dashed;border-color:var(--verde);color:var(--verde);padding:24px;">
-          📂 Seleccionar archivo Excel (.xls / .xlsx)
+          <svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:5px"><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/><path d="M12 3.5v10.5"/><path d="M8.5 10.5 12 14l3.5-3.5"/></svg>Seleccionar archivo Excel (.xls / .xlsx)
         </label>
         <input type="file" id="import-file" accept=".xls,.xlsx" style="display:none;" />
         <div id="msg-import" class="msg"></div>
@@ -476,7 +476,7 @@
       <!-- Paso 3: resultado -->
       <div id="import-paso-3" style="display:none;">
         <div style="text-align:center;padding:10px 0 16px;">
-          <div style="font-size:2.4rem;">✅</div>
+          <div style="color:var(--verde);"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.2 11 14.7l4.6-5.2"/></svg></div>
           <p style="font-size:1rem;font-weight:700;margin-top:6px;" id="import-resultado-titulo">Ventas importadas</p>
           <p style="font-size:0.85rem;color:var(--texto-3);" id="import-resultado-detalle"></p>
         </div>
@@ -489,14 +489,14 @@
   <!-- MODAL ELECCIÓN TIPO DE AJUSTE -->
   <div class="modal-overlay" id="modal-ajuste-tipo">
     <div class="modal">
-      <div class="modal-header"><span class="modal-titulo">⚖️ Ajuste de Inventario</span><button class="btn-cerrar-modal" data-cerrar="modal-ajuste-tipo">×</button></div>
+      <div class="modal-header"><span class="modal-titulo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.2em;margin-right:6px"><path d="M4 8h8"/><path d="M17 8h3"/><circle cx="14.5" cy="8" r="2.3"/><path d="M4 16h4"/><path d="M13 16h7"/><circle cx="10.5" cy="16" r="2.3"/></svg>Ajuste de Inventario</span><button class="btn-cerrar-modal" data-cerrar="modal-ajuste-tipo">×</button></div>
       <p style="font-size:0.85rem;color:var(--texto-2);margin-bottom:16px;">¿Cómo querés ajustar el inventario?</p>
       <button class="btn btn-secondary" id="btn-ajuste-rapido" style="margin-bottom:10px;width:100%;text-align:left;padding:14px 16px;">
         <div style="font-weight:700;">⚡ Ajuste rápido</div>
         <div style="font-size:0.78rem;color:var(--texto-3);font-weight:400;">Corregir el acopio de un solo producto</div>
       </button>
       <button class="btn btn-secondary" id="btn-ajuste-conteo" style="width:100%;text-align:left;padding:14px 16px;">
-        <div style="font-weight:700;">📋 Conteo físico</div>
+        <div style="font-weight:700;"><svg class="ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.16em;margin-right:5px"><path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><circle cx="4.5" cy="6" r="1.1"/><circle cx="4.5" cy="12" r="1.1"/><circle cx="4.5" cy="18" r="1.1"/></svg>Conteo físico</div>
         <div style="font-size:0.78rem;color:var(--texto-3);font-weight:400;">Ajustar acopio y despacho de varios productos a la vez</div>
       </button>
     </div>
@@ -505,7 +505,7 @@
   <!-- MODAL CORREGIR MOTIVO DE UN RETIRO -->
   <div class="modal-overlay" id="modal-editar-motivo">
     <div class="modal">
-      <div class="modal-header"><span class="modal-titulo">✏️ Corregir motivo del retiro</span><button class="btn-cerrar-modal" data-cerrar="modal-editar-motivo">×</button></div>
+      <div class="modal-header"><span class="modal-titulo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.2em;margin-right:6px"><path d="M12.5 20H21"/><path d="M16.8 3.7a2 2 0 0 1 2.8 2.8L7.5 18.6 3.5 20l1.4-4L16.8 3.7Z"/></svg>Corregir motivo del retiro</span><button class="btn-cerrar-modal" data-cerrar="modal-editar-motivo">×</button></div>
       <div id="edm-info" style="background:var(--bg-secondary);border:1px solid var(--borde);border-radius:var(--radio-input);padding:10px 14px;margin-bottom:14px;font-size:0.85rem;"></div>
       <div class="form-group"><label class="form-label">Nuevo motivo</label><select class="form-control" id="edm-motivo"></select></div>
       <div class="form-group" id="edm-grupo-sector" style="display:none;"><label class="form-label">Sector de despacho destino</label><select class="form-control" id="edm-sector"></select></div>
