@@ -241,11 +241,11 @@ function actualizarInfoRetiro() {
     }else if(sects.length===1){
       grupoSector.style.display="none";
       infoDestino.style.display="";
-      infoDestino.innerHTML=`<div style="background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--texto-2);">🔁 ${motivoObj.nombre} — el stock irá automáticamente a <strong style="color:var(--verde);">${sects[0]}</strong></div>`;
+      infoDestino.innerHTML=`<div style="background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--texto-2);">${icono("reposicion",{size:14})} ${motivoObj.nombre} — el stock irá automáticamente a <strong style="color:var(--verde);">${sects[0]}</strong></div>`;
     }else{
       grupoSector.style.display="none";
       infoDestino.style.display="";
-      infoDestino.innerHTML=`<div style="background:var(--bajo-bg);border:1px solid #F0D9B5;border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--bajo-txt);">⚠️ Producto de despacho sin sector asignado.</div>`;
+      infoDestino.innerHTML=`<div style="background:var(--bajo-bg);border:1px solid #F0D9B5;border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--bajo-txt);">${icono("alerta",{size:13})} Producto de despacho sin sector asignado.</div>`;
     }
   }else{
     grupoSector.style.display="none";
@@ -439,7 +439,7 @@ document.getElementById("btn-confirmar-ajuste").addEventListener("click",async()
 
 // ── MOVIMIENTOS Y HISTORIAL ───────────────────────────────────
 const COLORES_MOV={INGRESO_PROVEEDOR:"var(--normal-txt)",INGRESO_PRODUCCION:"var(--normal-txt)",RETIRO:"var(--critico-txt)",VENTA:"var(--verde)",AJUSTE:"var(--texto-2)"};
-const LABELS_MOV={INGRESO_PROVEEDOR:"↑ Proveedor",INGRESO_PRODUCCION:"↑ Producción",RETIRO:"↓ Retiro",VENTA:"💰 Venta",AJUSTE:"⚖ Ajuste"};
+const LABELS_MOV={INGRESO_PROVEEDOR:"↑ Proveedor",INGRESO_PRODUCCION:"↑ Producción",RETIRO:"↓ Retiro",VENTA:`${icono("venta",{size:12})} Venta`,AJUSTE:`${icono("ajuste",{size:12})} Ajuste`};
 
 function filaMov(m){
   const ts=m.fecha_hora?.toDate?.();
@@ -629,7 +629,7 @@ document.getElementById("btn-exportar-excel").addEventListener("click",async()=>
   const ws=XLSX.utils.json_to_sheet(filas);ws["!cols"]=[{wch:12},{wch:8},{wch:28},{wch:20},{wch:10},{wch:10},{wch:15},{wch:15},{wch:35},{wch:20}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Historial");
   XLSX.writeFile(wb,`historial-administrador-${new Date().toLocaleDateString("es-AR").replace(/\//g,"-")}.xlsx`);
-  btn.disabled=false;btn.textContent="📥 Exportar a Excel";
+  btn.disabled=false;btn.innerHTML=icono("exportar",{size:15})+" Exportar a Excel";
 });
 
 function mostrarMsg(el,tipo,texto){el.textContent=texto;el.className=`msg show msg-${tipo==="error"?"error":"ok"}`;}

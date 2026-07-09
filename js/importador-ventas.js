@@ -6,6 +6,7 @@
 
 import { auth, db } from "./firebase-config.js";
 import { debeAvanzar } from "./corte-ventas.js";
+import { icono } from "./iconos.js";
 import {
   collection, doc, addDoc, getDocs, query, orderBy,
   serverTimestamp, writeBatch, increment
@@ -249,16 +250,16 @@ function construirPreview(items) {
         }).join("");
         let aviso;
         if (f.noConfig) {
-          aviso = `<div style="font-size:0.72rem;color:var(--bajo-txt);">⚠️ variante "${escHtml(f.tamanoExcel||"sin tamaño")}" no configurada en la receta — no se descuenta</div>`;
+          aviso = `<div style="font-size:0.72rem;color:var(--bajo-txt);">${icono("alerta",{size:12})} variante "${escHtml(f.tamanoExcel||"sin tamaño")}" no configurada en la receta — no se descuenta</div>`;
         } else if (sinSector || sinIng) {
-          aviso = `<div style="font-size:0.72rem;color:var(--bajo-txt);">⚠️ ${sinSector ? "sin sector asignado" : "sin ingredientes"} — no se descuenta</div>`;
+          aviso = `<div style="font-size:0.72rem;color:var(--bajo-txt);">${icono("alerta",{size:12})} ${sinSector ? "sin sector asignado" : "sin ingredientes"} — no se descuenta</div>`;
         } else {
-          aviso = `<div style="font-size:0.72rem;color:var(--texto-3);margin-bottom:3px;">🍸 arma en ${escHtml(f.sectorReceta)}:</div>${ingHtml}`;
+          aviso = `<div style="font-size:0.72rem;color:var(--texto-3);margin-bottom:3px;">${icono("receta",{size:12})} arma en ${escHtml(f.sectorReceta)}:</div>${ingHtml}`;
         }
         return `<div style="padding:10px 0;border-bottom:1px solid var(--borde);">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
             <div style="flex:1;min-width:0;">
-              <div style="font-size:0.88rem;font-weight:600;">🍸 ${escHtml(f.prod.nombre)}${tag} <span style="font-size:0.62rem;background:var(--bg-secondary);color:var(--texto-3);padding:1px 6px;border-radius:5px;">PLU ${escHtml(f.prod.plu)}</span></div>
+              <div style="font-size:0.88rem;font-weight:600;">${icono("receta",{size:13})} ${escHtml(f.prod.nombre)}${tag} <span style="font-size:0.62rem;background:var(--bg-secondary);color:var(--texto-3);padding:1px 6px;border-radius:5px;">PLU ${escHtml(f.prod.plu)}</span></div>
               ${aviso}
             </div>
             <span style="font-size:0.95rem;font-weight:700;color:var(--verde);white-space:nowrap;">${f.cantidad} u.</span>
@@ -270,7 +271,7 @@ function construirPreview(items) {
         ? `<select class="form-control import-sector-sel" data-idx="${idx}" style="font-size:0.8rem;padding:6px 8px;margin-top:4px;">${f.sectores.map(s=>`<option value="${escHtml(s)}">${escHtml(s)}</option>`).join("")}</select>`
         : (f.sectores.length === 1
             ? `<span style="font-size:0.72rem;color:var(--texto-3);">→ ${escHtml(f.sectores[0])}</span>`
-            : `<span style="font-size:0.72rem;color:var(--bajo-txt);">⚠️ sin sector de despacho</span>`);
+            : `<span style="font-size:0.72rem;color:var(--bajo-txt);">${icono("alerta",{size:12})} sin sector de despacho</span>`);
       return `<div style="padding:10px 0;border-bottom:1px solid var(--borde);">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
           <div style="flex:1;min-width:0;">
@@ -305,9 +306,9 @@ function construirPreview(items) {
   if (avisoFecha) {
     if (_fechaCorte) {
       const fStr = _fechaCorte.toLocaleDateString("es-AR", { day:"2-digit", month:"2-digit", year:"numeric" });
-      avisoFecha.innerHTML = `<div style="background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:9px 12px;font-size:0.82rem;color:var(--texto-2);margin-bottom:12px;">📅 Período del reporte detectado — las ventas quedarán cargadas <b>hasta el ${fStr}</b></div>`;
+      avisoFecha.innerHTML = `<div style="background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:9px 12px;font-size:0.82rem;color:var(--texto-2);margin-bottom:12px;">${icono("corte",{size:13})} Período del reporte detectado — las ventas quedarán cargadas <b>hasta el ${fStr}</b></div>`;
     } else {
-      avisoFecha.innerHTML = `<div style="background:var(--bajo-bg);border:1px solid #F0D9B5;border-radius:var(--radio-input);padding:9px 12px;font-size:0.82rem;color:var(--bajo-txt);margin-bottom:12px;">⚠️ No se detectó la fecha del período en el archivo. La fecha de corte no se actualizará.</div>`;
+      avisoFecha.innerHTML = `<div style="background:var(--bajo-bg);border:1px solid #F0D9B5;border-radius:var(--radio-input);padding:9px 12px;font-size:0.82rem;color:var(--bajo-txt);margin-bottom:12px;">${icono("alerta",{size:13})} No se detectó la fecha del período en el archivo. La fecha de corte no se actualizará.</div>`;
     }
   }
 

@@ -9,6 +9,7 @@ import {
   escHtml, fmtN, esDespacho, sectoresDe, acopioBajoOcero,
   origenRetiroActual, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida
 } from "./core-inventario.js";
+import { icono } from "./iconos.js";
 import {
   collection, doc, addDoc, updateDoc, getDocs,
   query, orderBy, limit, where, serverTimestamp, writeBatch, increment
@@ -119,11 +120,11 @@ function actualizarInfo() {
     } else if (sects.length === 1) {
       grupoSector.style.display = "none";
       infoDestino.style.display = "";
-      infoDestino.innerHTML = `<div style="background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--texto-2);">🔁 ${motivoObj.nombre} — el stock irá automáticamente a <strong style="color:var(--verde);">${sects[0]}</strong></div>`;
+      infoDestino.innerHTML = `<div style="background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--texto-2);">${icono("reposicion",{size:14})} ${motivoObj.nombre} — el stock irá automáticamente a <strong style="color:var(--verde);">${sects[0]}</strong></div>`;
     } else {
       grupoSector.style.display = "none";
       infoDestino.style.display = "";
-      infoDestino.innerHTML = `<div style="background:var(--bajo-bg);border:1px solid #F0D9B5;border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--bajo-txt);">⚠️ Producto de despacho sin sector asignado. Avisale al Gerente.</div>`;
+      infoDestino.innerHTML = `<div style="background:var(--bajo-bg);border:1px solid #F0D9B5;border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--bajo-txt);">${icono("alerta",{size:13})} Producto de despacho sin sector asignado. Avisale al Gerente.</div>`;
     }
   } else {
     grupoSector.style.display = "none";

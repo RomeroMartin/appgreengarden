@@ -443,7 +443,7 @@ function bloqueIngredientesHTML(target, sector, ingredientes, conSector = true) 
          <div class="bloque-ing-hint" style="font-size:0.74rem;color:var(--verde,#2d6a4f);font-weight:600;margin-bottom:8px;min-height:1em;"></div>
          <button type="button" class="btn btn-secondary" data-action="add-ing" data-target="${target}" style="width:100%;padding:11px;">＋ Agregar ingrediente</button>
        </div>`
-    : `<div style="font-size:0.78rem;color:var(--bajo-txt,#b45309);background:var(--bg-secondary);border:1px dashed var(--borde);border-radius:8px;padding:10px 12px;">⚠️ No hay productos cargados todavía. Creá primero los productos que componen la receta (ej. Gin, Tónica, Barril).</div>`;
+    : `<div style="font-size:0.78rem;color:var(--bajo-txt,#b45309);background:var(--bg-secondary);border:1px dashed var(--borde);border-radius:8px;padding:10px 12px;">${icono("alerta",{size:13})} No hay productos cargados todavía. Creá primero los productos que componen la receta (ej. Gin, Tónica, Barril).</div>`;
   return `${selSector}
     <div class="bloque-ings" style="background:var(--bg-primary);border:1px solid var(--borde);border-radius:8px;padding:8px 10px;margin-bottom:6px;">${ings}</div>
     ${filaAgregar}`;
@@ -872,11 +872,11 @@ function actualizarInfoRetiro() {
     } else if (sects.length === 1) {
       grupoSector.style.display = "none";
       infoDestino.style.display = "";
-      infoDestino.innerHTML = `<div style="background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--texto-2);">🔁 ${motivoObj.nombre} — el stock irá automáticamente a <strong style="color:var(--verde);">${sects[0]}</strong></div>`;
+      infoDestino.innerHTML = `<div style="background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--texto-2);">${icono("reposicion",{size:14})} ${motivoObj.nombre} — el stock irá automáticamente a <strong style="color:var(--verde);">${sects[0]}</strong></div>`;
     } else {
       grupoSector.style.display = "none";
       infoDestino.style.display = "";
-      infoDestino.innerHTML = `<div style="background:var(--bajo-bg);border:1px solid #F0D9B5;border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--bajo-txt);">⚠️ Producto de despacho sin sector asignado.</div>`;
+      infoDestino.innerHTML = `<div style="background:var(--bajo-bg);border:1px solid #F0D9B5;border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--bajo-txt);">${icono("alerta",{size:13})} Producto de despacho sin sector asignado.</div>`;
     }
   } else {
     grupoSector.style.display = "none";
@@ -1052,7 +1052,7 @@ document.getElementById("btn-confirmar-venta").addEventListener("click", async (
 
 // ── MOVIMIENTOS RECIENTES Y FILA ──────────────────────────────
 const COLORES_MOV = { INGRESO_PROVEEDOR:"var(--normal-txt)", INGRESO_PRODUCCION:"var(--normal-txt)", RETIRO:"var(--critico-txt)", VENTA:"var(--verde)", AJUSTE:"var(--texto-2)" };
-const LABELS_MOV  = { INGRESO_PROVEEDOR:"↑ Proveedor", INGRESO_PRODUCCION:"↑ Producción", RETIRO:"↓ Retiro", VENTA:"💰 Venta", AJUSTE:"⚖ Ajuste" };
+const LABELS_MOV  = { INGRESO_PROVEEDOR:"↑ Proveedor", INGRESO_PRODUCCION:"↑ Producción", RETIRO:"↓ Retiro", VENTA:`${icono("venta",{size:12})} Venta`, AJUSTE:`${icono("ajuste",{size:12})} Ajuste` };
 
 function filaMovimiento(m) {
   const ts    = m.fecha_hora?.toDate?.();
@@ -1393,7 +1393,7 @@ document.getElementById("btn-exportar-excel").addEventListener("click", async ()
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Historial");
   XLSX.writeFile(wb, `historial-green-garden-${new Date().toLocaleDateString("es-AR").replace(/\//g,"-")}.xlsx`);
-  btn.disabled = false; btn.textContent = "📥 Exportar a Excel";
+  btn.disabled = false; btn.innerHTML = icono("exportar",{size:15}) + " Exportar a Excel";
 });
 
 // ── CONFIRMACIÓN Y UTILIDADES ─────────────────────────────────

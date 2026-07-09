@@ -5,6 +5,8 @@
 // Las materias primas quedan fuera de este sistema.
 // ============================================================
 
+import { icono } from "./iconos.js";
+
 const esDespacho = (p) => p.tipo === "Despacho";
 
 // ── Helpers de fecha ──────────────────────────────────────────
@@ -100,7 +102,7 @@ export function renderResumen(contenedorId, productos) {
   const hayAtraso = r.atrasados > 0;
   cont.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;background:${hayAtraso ? 'var(--bajo-bg)' : 'var(--verde-claro)'};border:1px solid ${hayAtraso ? '#F0D9B5' : 'var(--verde-suave)'};border-radius:var(--radio-input);padding:10px 14px;">
-      <span style="font-size:1.2rem;">${hayAtraso ? '⚠️' : '📅'}</span>
+      <span style="display:inline-flex;color:${hayAtraso ? 'var(--bajo-txt)' : 'var(--verde)'};">${hayAtraso ? icono("alerta",{size:19}) : icono("corte",{size:19})}</span>
       <div style="flex:1;">
         <div style="font-size:0.68rem;color:var(--texto-3);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Ventas cargadas</div>
         <div style="font-size:0.9rem;font-weight:700;color:var(--texto);">Más reciente: ${recienteStr}</div>
@@ -115,11 +117,11 @@ export function badgeProducto(producto, masReciente) {
   if (!esDespacho(producto)) return ""; // materias primas: nada
   const f = ventasHastaDe(producto);
   if (!f) {
-    return `<span style="font-size:0.68rem;color:var(--texto-3);">📅 sin ventas cargadas</span>`;
+    return `<span style="font-size:0.68rem;color:var(--texto-3);display:inline-flex;align-items:center;gap:3px;">${icono("corte",{size:12})} sin ventas cargadas</span>`;
   }
   const atrasado = estaAtrasado(producto, masReciente);
   const color = atrasado ? "var(--bajo-txt)" : "var(--texto-3)";
-  const icono = atrasado ? "⚠️" : "📅";
+  const mark = atrasado ? icono("alerta",{size:12}) : icono("corte",{size:12});
   const etiqueta = atrasado ? " (atrasado)" : "";
-  return `<span style="font-size:0.68rem;color:${color};font-weight:${atrasado?'600':'400'};">${icono} ventas al ${formatearFecha(f, false)}${etiqueta}</span>`;
+  return `<span style="font-size:0.68rem;color:${color};font-weight:${atrasado?'600':'400'};display:inline-flex;align-items:center;gap:3px;">${mark} ventas al ${formatearFecha(f, false)}${etiqueta}</span>`;
 }
