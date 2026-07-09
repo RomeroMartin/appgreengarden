@@ -12,6 +12,7 @@ import {
   escHtml, fmtN, esDespacho, sectoresDe, stockTotal, getBadge, acopioBajoOcero,
   origenRetiroActual, aDatetimeLocal, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida
 } from "./core-inventario.js";
+import { icono } from "./iconos.js";
 import {
   collection, doc, addDoc, updateDoc, getDocs,
   onSnapshot, query, orderBy, limit, serverTimestamp, writeBatch, increment
@@ -116,8 +117,8 @@ function renderStock() {
     const dep=p.stock_deposito??0;const des=p.stock_despacho??{};
     const total=stockTotal(p);const badge=getBadge(p);
     const tipoBadge=esDespacho(p)
-      ?'<span style="font-size:0.65rem;background:var(--verde-claro);color:var(--verde);padding:2px 8px;border-radius:10px;font-weight:600;">🥤</span>'
-      :'<span style="font-size:0.65rem;background:var(--bg-secondary);color:var(--texto-3);padding:2px 8px;border-radius:10px;font-weight:600;">🌾</span>';
+      ?`<span style="font-size:0.65rem;background:var(--verde-claro);color:var(--verde);padding:2px 8px;border-radius:10px;font-weight:600;display:inline-flex;align-items:center;">${icono("despacho",{size:12})}</span>`
+      :`<span style="font-size:0.65rem;background:var(--bg-secondary);color:var(--texto-3);padding:2px 8px;border-radius:10px;font-weight:600;display:inline-flex;align-items:center;">${icono("materia",{size:12})}</span>`;
     const desglose=Object.entries(des).filter(([,v])=>v!==0).map(([k,v])=>{const neg=v<0;return `<span style="font-size:0.75rem;background:var(--bg-secondary);padding:2px 8px;border-radius:4px;margin:2px;${neg?'color:var(--critico-txt);':''}">${escHtml(k)}: <strong>${fmtN(v)}</strong></span>`;}).join("");
     return `<div class="item-row" style="flex-direction:column;align-items:flex-start;gap:6px;">
       <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
@@ -127,7 +128,7 @@ function renderStock() {
           ${badge?`<span class="stock-badge ${badge.cls}">${badge.label}</span>`:""}
         </div>
       </div>
-      <div style="font-size:0.78rem;color:var(--texto-3);">🏪 Acopio: <strong style="color:var(--texto-2);">${fmtN(dep)}</strong> ${desglose?`· ${desglose}`:""}</div>
+      <div style="font-size:0.78rem;color:var(--texto-3);display:flex;align-items:center;gap:4px;flex-wrap:wrap;">${icono("acopio",{size:13})} Acopio: <strong style="color:var(--texto-2);">${fmtN(dep)}</strong> ${desglose?`· ${desglose}`:""}</div>
       ${badgeProducto(p,_masReciente)?`<div style="margin-top:2px;">${badgeProducto(p,_masReciente)}</div>`:""}
     </div>`;
   }).join("");

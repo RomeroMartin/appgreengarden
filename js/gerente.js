@@ -13,6 +13,7 @@ import {
   escHtml, fmtN, esDespacho, esReceta, sectoresDe, stockTotal, getBadge, acopioBajoOcero,
   origenRetiroActual, aDatetimeLocal, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida
 } from "./core-inventario.js";
+import { icono } from "./iconos.js";
 import {
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc,
   getDocs, onSnapshot, query, orderBy, limit, serverTimestamp, writeBatch, increment
@@ -272,8 +273,8 @@ function renderStock() {
     const total = stockTotal(p);
     const badge = getBadge(p);
     const tipoBadge = esDespacho(p)
-      ? '<span style="font-size:0.65rem;background:var(--verde-claro);color:var(--verde);padding:2px 8px;border-radius:10px;font-weight:600;">🥤 Despacho</span>'
-      : '<span style="font-size:0.65rem;background:var(--bg-secondary);color:var(--texto-3);padding:2px 8px;border-radius:10px;font-weight:600;">🌾 Mat. prima</span>';
+      ? `<span style="font-size:0.65rem;background:var(--verde-claro);color:var(--verde);padding:2px 8px;border-radius:10px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">${icono("despacho",{size:12})} Despacho</span>`
+      : `<span style="font-size:0.65rem;background:var(--bg-secondary);color:var(--texto-3);padding:2px 8px;border-radius:10px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">${icono("materia",{size:12})} Mat. prima</span>`;
     const desglose = Object.entries(des).filter(([,v]) => v !== 0)
       .map(([k,v]) => { const neg = v < 0; return `<span style="font-size:0.75rem;background:var(--bg-secondary);padding:2px 8px;border-radius:4px;margin-right:4px;${neg?'color:var(--critico-txt);':''}">${escHtml(k)}: <strong>${fmtN(v)}</strong></span>`; }).join("");
     return `<div class="item-row" style="flex-direction:column;align-items:flex-start;gap:6px;">
@@ -287,7 +288,7 @@ function renderStock() {
           ${badge ? `<span class="stock-badge ${badge.cls}">${badge.label}</span>` : ""}
         </div>
       </div>
-      <div style="font-size:0.78rem;color:var(--texto-3);">🏪 Acopio: <strong style="color:var(--texto-2);">${fmtN(dep)}</strong> ${desglose?`· ${desglose}`:""}</div>
+      <div style="font-size:0.78rem;color:var(--texto-3);display:flex;align-items:center;gap:4px;flex-wrap:wrap;">${icono("acopio",{size:13})} Acopio: <strong style="color:var(--texto-2);">${fmtN(dep)}</strong> ${desglose?`· ${desglose}`:""}</div>
       ${badgeProducto(p, _masReciente) ? `<div style="margin-top:2px;">${badgeProducto(p, _masReciente)}</div>` : ""}
     </div>`;
   }).join("");
@@ -299,7 +300,7 @@ function renderProductos() {
   const cont = document.getElementById("lista-productos");
   if (!productos.length) { cont.innerHTML = '<div class="empty-state"><p>Sin productos.</p></div>'; return; }
   cont.innerHTML = productos.map(p => {
-    const tipoIcon = esReceta(p) ? "🍸" : esDespacho(p) ? "🥤" : "🌾";
+    const tipoIcon = esReceta(p) ? icono("receta",{size:15}) : esDespacho(p) ? icono("despacho",{size:15}) : icono("materia",{size:15});
     let detalle;
     if (esReceta(p)) {
       if (p.por_variantes) {
