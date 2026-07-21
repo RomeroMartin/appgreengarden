@@ -69,15 +69,15 @@ service cloud.firestore {
 
     // ── MOVIMIENTOS ──────────────────────────────────────────────
     // Todos los logueados crean (registran su operación) y leen.
-    // Editar un movimiento (corregir motivo) = Gerente o Admin.
-    // Borrar = solo Gerente.
+    // Editar un movimiento (producto / cantidad / motivo) = Gerente o Admin.
+    // Borrar un movimiento (revierte el stock) = Gerente o Admin.
     match /movimientos/{id} {
       allow read:   if logueado();
       // El movimiento debe quedar registrado a nombre del usuario que lo crea
       // (nadie puede falsificar el autor de una operación).
       allow create: if logueado() && request.resource.data.id_usuario == request.auth.uid;
       allow update: if gerenteOAdmin();
-      allow delete: if esGerente();
+      allow delete: if gerenteOAdmin();
     }
 
     // ── Todo lo demás: denegado por defecto ──────────────────────

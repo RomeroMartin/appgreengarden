@@ -271,16 +271,28 @@
     </div>
   </div>
 
-  <!-- MODAL CORREGIR MOTIVO DE UN RETIRO -->
+  <!-- MODAL EDITAR RETIRO (producto, cantidad, motivo, eliminar) -->
   <div class="modal-overlay" id="modal-editar-motivo">
     <div class="modal">
-      <div class="modal-header"><span class="modal-titulo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.2em;margin-right:6px"><path d="M12.5 20H21"/><path d="M16.8 3.7a2 2 0 0 1 2.8 2.8L7.5 18.6 3.5 20l1.4-4L16.8 3.7Z"/></svg>Corregir motivo del retiro</span><button class="btn-cerrar-modal" data-cerrar="modal-editar-motivo">×</button></div>
+      <div class="modal-header"><span class="modal-titulo"><svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.2em;margin-right:6px"><path d="M12.5 20H21"/><path d="M16.8 3.7a2 2 0 0 1 2.8 2.8L7.5 18.6 3.5 20l1.4-4L16.8 3.7Z"/></svg>Editar retiro</span><button class="btn-cerrar-modal" data-cerrar="modal-editar-motivo">×</button></div>
       <div id="edm-info" style="background:var(--bg-secondary);border:1px solid var(--borde);border-radius:var(--radio-input);padding:10px 14px;margin-bottom:14px;font-size:0.85rem;"></div>
-      <div class="form-group"><label class="form-label">Nuevo motivo</label><select class="form-control" id="edm-motivo"></select></div>
+      <div class="form-group"><label class="form-label">Producto</label><input type="search" class="form-control" id="edm-buscar" placeholder="🔍 Buscar producto…" style="margin-bottom:6px;"><select class="form-control" id="edm-producto"></select></div>
+      <div class="form-group"><label class="form-label">Cantidad</label><input type="number" class="form-control" id="edm-cantidad" min="0" step="any" inputmode="decimal"></div>
+      <div class="form-group"><label class="form-label">Motivo</label><select class="form-control" id="edm-motivo"></select></div>
       <div class="form-group" id="edm-grupo-sector" style="display:none;"><label class="form-label">Sector de despacho destino</label><select class="form-control" id="edm-sector"></select></div>
       <div id="edm-preview" style="font-size:0.8rem;color:var(--texto-2);background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:9px 12px;margin-bottom:12px;"></div>
       <div id="msg-editar-motivo" class="msg"></div>
-      <div class="mt-16"><button class="btn btn-secondary" id="btn-confirmar-editar-motivo" style="border-color:var(--texto-3);color:var(--texto-3);">Aplicar corrección</button></div>
+      <div class="mt-16"><button class="btn btn-secondary" id="btn-confirmar-editar-motivo" style="border-color:var(--texto-3);color:var(--texto-3);">Aplicar cambios</button></div>
+      <div style="margin-top:14px;border-top:1px solid var(--borde);padding-top:12px;">
+        <button class="btn btn-danger btn-sm" id="btn-eliminar-mov">Eliminar movimiento</button>
+        <div id="edm-confirm-eliminar" style="display:none;margin-top:10px;">
+          <div id="edm-eliminar-preview" style="font-size:0.8rem;color:var(--critico-txt);background:var(--critico-bg);border:1px solid #F5C6C5;border-radius:var(--radio-input);padding:9px 12px;margin-bottom:10px;"></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" id="btn-cancelar-eliminar" style="flex:1;">Cancelar</button>
+            <button class="btn btn-sm" id="btn-confirmar-eliminar" style="flex:1;background:var(--critico-txt);color:#fff;">Sí, eliminar</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

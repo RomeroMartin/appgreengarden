@@ -449,7 +449,7 @@ function filaMov(m){
   const label=LABELS_MOV[m.tipo]||escHtml(m.tipo);
   const destinoExtra=(m.tipo==="RETIRO"&&m.destino&&m.destino!=="produccion"&&m.destino!=="consumo")?` → ${escHtml(m.destino)}`:"";
   const corregido=m.corregido?` <span style="font-size:0.62rem;background:var(--bg-secondary);color:var(--texto-3);padding:1px 6px;border-radius:5px;display:inline-flex;align-items:center;gap:3px;">${icono("editar",{size:10})} corregido</span>`:"";
-  const btnEditar=(m.tipo==="RETIRO"&&m.id)?`<button class="btn-icono" onclick="abrirEditarMotivo('${m.id}')" title="Corregir motivo" style="padding:2px 7px;">${icono("editar",{size:16})}</button>`:"";
+  const btnEditar=(m.tipo==="RETIRO"&&m.id)?`<button class="btn-icono" onclick="abrirEditarMotivo('${m.id}')" title="Editar retiro" style="padding:2px 7px;">${icono("editar",{size:16})}</button>`:"";
   return `<div class="mov-row"><div class="mov-header"><span class="mov-producto">${escHtml(m.nombre_producto||"—")}</span><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:0.85rem;font-weight:700;color:${color};">${escHtml(m.cantidad)} ${escHtml(m.unidad||"")}</span>${btnEditar}</div></div><div class="mov-meta">${fecha} ${hora} · <span style="color:${color};font-weight:600;">${label}${destinoExtra}</span> · ${escHtml(m.nombre_usuario||"—")} · ${escHtml(m.motivo||"")}${corregido}</div></div>`;
 }
 
@@ -495,7 +495,11 @@ function renderHistorial() {
   cont.innerHTML=lista.map(filaMov).join("");
 }
 
-// ── CORREGIR MOTIVO DE UN RETIRO (reverse + apply, contempla origen) ──
+// ── EDITAR RETIRO (producto, cantidad, motivo) + ELIMINAR ──
+// Reverse + apply: revierte el efecto del movimiento ORIGINAL (producto,
+// cantidad, origen y destino reales) y aplica el editado. Si cambia el
+// producto, la reversión toca el viejo y la aplicación el nuevo (dos docs).
+// Eliminar = solo revertir y borrar el movimiento.
 let edmMov=null;
 const esDestinoSector=(x)=>!!x&&!["consumo","produccion","externo","salon","acopio",""].includes(x);
 function efectoRetiro(origen,destino,cantidad){
@@ -509,20 +513,41 @@ function efectoRetiro(origen,destino,cantidad){
   }
   return ef;
 }
+const edmProdSel=()=>productos.find(p=>p.id===document.getElementById("edm-producto").value);
+const edmCant=()=>parseFloat(document.getElementById("edm-cantidad").value);
+function edmPoblarProductos(filtro){
+  const sel=document.getElementById("edm-producto");
+  const actual=sel.value;
+  const t=(filtro||"").toLowerCase();
+  const lista=productos.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+  const f=t?lista.filter(p=>(p.nombre||"").toLowerCase().includes(t)):lista;
+  sel.innerHTML=f.map(p=>`<option value="${p.id}">${escHtml(p.nombre)}</option>`).join("");
+  if(actual&&f.some(p=>p.id===actual))sel.value=actual;
+}
+function edmPoblarMotivos(){
+  const m=edmMov;if(!m)return;
+  const prod=edmProdSel();
+  const sel=document.getElementById("edm-motivo");
+  const prev=sel.value||(m.motivo||"").split(" — ")[0];
+  const desdeDespacho=!!(m.origen&&m.origen!=="acopio");
+  let opciones=motivosSalida;
+  if((prod&&!esDespacho(prod))||desdeDespacho)opciones=motivosSalida.filter(x=>!x.transfiere);
+  sel.innerHTML=opciones.map(x=>`<option value="${escHtml(x.nombre)}" ${x.nombre===prev?"selected":""}>${escHtml(x.nombre)}${x.transfiere?" (→ despacho)":""}</option>`).join("");
+  if(!opciones.some(x=>x.nombre===prev)&&opciones[0])sel.value=opciones[0].nombre;
+}
 window.abrirEditarMotivo=(id)=>{
   const m=movIndex[id];
   if(!m||m.tipo!=="RETIRO")return;
   edmMov=m;
-  const prod=productos.find(p=>p.id===m.id_producto);
-  const base=(m.motivo||"").split(" — ")[0];
-  const desdeDespacho=!!(m.origen&&m.origen!=="acopio");
-  document.getElementById("edm-info").innerHTML=`<div><strong>${escHtml(m.nombre_producto)}</strong> · ${escHtml(m.cantidad)} ${escHtml(m.unidad||"")}</div><div style="color:var(--texto-3);font-size:0.78rem;margin-top:2px;">Motivo actual: ${escHtml(m.motivo||"—")} · salió de <strong>${escHtml(m.origen||"acopio")}</strong>${esDestinoSector(m.destino)?" → "+escHtml(m.destino):""}</div>`;
-  const sel=document.getElementById("edm-motivo");
-  let opciones=motivosSalida;
-  if((prod&&!esDespacho(prod))||desdeDespacho)opciones=motivosSalida.filter(x=>!x.transfiere);
-  sel.innerHTML=opciones.map(x=>`<option value="${x.nombre}" ${x.nombre===base?"selected":""}>${x.nombre}${x.transfiere?" (→ despacho)":""}</option>`).join("");
-  edmActualizar();
+  document.getElementById("edm-info").innerHTML=`<div><strong>${escHtml(m.nombre_producto)}</strong> · original: ${escHtml(m.cantidad)} ${escHtml(m.unidad||"")}</div><div style="color:var(--texto-3);font-size:0.78rem;margin-top:2px;">Motivo actual: ${escHtml(m.motivo||"—")} · salió de <strong>${escHtml(m.origen||"acopio")}</strong>${esDestinoSector(m.destino)?" → "+escHtml(m.destino):""}</div>`;
+  document.getElementById("edm-buscar").value="";
+  edmPoblarProductos("");
+  document.getElementById("edm-producto").value=m.id_producto;
+  document.getElementById("edm-cantidad").value=m.cantidad;
+  edmPoblarMotivos();
+  document.getElementById("edm-confirm-eliminar").style.display="none";
   document.getElementById("msg-editar-motivo").classList.remove("show");
+  edmActualizar();
   abrirModal("modal-editar-motivo");
 };
 function edmDestinoNuevo(prod,newTransf){
@@ -533,15 +558,45 @@ function edmDestinoNuevo(prod,newTransf){
 }
 function edmEsTransfNuevo(){
   const m=edmMov;if(!m)return false;
-  const prod=productos.find(p=>p.id===m.id_producto);
+  const prod=edmProdSel();
   const origen=m.origen||"acopio";
   const mo=motivosSalida.find(x=>x.nombre===document.getElementById("edm-motivo").value);
   return !!(mo&&mo.transfiere)&&esDespacho(prod)&&origen==="acopio";
 }
+function edmDeltas(incluirApply){
+  const m=edmMov;
+  const origen=m.origen||"acopio";
+  const deltas={};
+  const add=(pid,ef,sign)=>{
+    if(!deltas[pid])deltas[pid]={acopio:0,despacho:{}};
+    deltas[pid].acopio+=sign*ef.acopio;
+    Object.keys(ef.despacho).forEach(s=>{deltas[pid].despacho[s]=(deltas[pid].despacho[s]||0)+sign*ef.despacho[s];});
+  };
+  add(m.id_producto,efectoRetiro(origen,m.destino,m.cantidad),-1);
+  if(incluirApply){
+    const prod=edmProdSel();
+    if(prod){
+      const newDestino=edmEsTransfNuevo()?edmDestinoNuevo(prod,true):"consumo";
+      add(prod.id,efectoRetiro(origen,newDestino,edmCant()||0),+1);
+    }
+  }
+  return deltas;
+}
+function edmFmtDeltas(deltas){
+  const lineas=[];
+  Object.keys(deltas).forEach(pid=>{
+    const p=productos.find(x=>x.id===pid);
+    const u=(p&&p.unidad_medida)||"";
+    const partes=[];
+    if(deltas[pid].acopio)partes.push(`acopio ${deltas[pid].acopio>0?"+":""}${+deltas[pid].acopio.toFixed(3)} ${u}`);
+    Object.keys(deltas[pid].despacho).forEach(s=>{const d=deltas[pid].despacho[s];if(d)partes.push(`${s} ${d>0?"+":""}${+d.toFixed(3)} ${u}`);});
+    if(partes.length)lineas.push(`${escHtml(p?p.nombre:"producto eliminado")}: ${partes.join(", ")}`);
+  });
+  return lineas;
+}
 function edmActualizar(){
   const m=edmMov;if(!m)return;
-  const prod=productos.find(p=>p.id===m.id_producto);
-  const origen=m.origen||"acopio";
+  const prod=edmProdSel();
   const newTransf=edmEsTransfNuevo();
   const grupo=document.getElementById("edm-grupo-sector");
   if(newTransf){
@@ -549,21 +604,23 @@ function edmActualizar(){
     document.getElementById("edm-sector").innerHTML=sects.map(s=>`<option value="${s}" ${s===m.destino?"selected":""}>${s}</option>`).join("");
     grupo.style.display=sects.length>1?"":"none";
   }else{grupo.style.display="none";}
-  const newDestino=newTransf?edmDestinoNuevo(prod,true):"consumo";
-  const oldEf=efectoRetiro(origen,m.destino,m.cantidad);
-  const newEf=efectoRetiro(origen,newDestino,m.cantidad);
-  const u=m.unidad||"";
-  const partes=[];
-  const dAcopio=newEf.acopio-oldEf.acopio;
-  if(dAcopio)partes.push(`acopio ${dAcopio>0?"+":""}${+dAcopio.toFixed(3)} ${u}`);
-  new Set([...Object.keys(oldEf.despacho),...Object.keys(newEf.despacho)]).forEach(s=>{
-    const d=(newEf.despacho[s]||0)-(oldEf.despacho[s]||0);
-    if(d)partes.push(`${s} ${d>0?"+":""}${+d.toFixed(3)} ${u}`);
-  });
-  document.getElementById("edm-preview").textContent=partes.length
-    ?`Se revierte el movimiento y se aplica el nuevo. Ajuste neto: ${partes.join(", ")}.`
-    :"Sin cambios de stock — solo se corrige la etiqueta del motivo.";
+  const lineas=edmFmtDeltas(edmDeltas(true));
+  document.getElementById("edm-preview").innerHTML=lineas.length
+    ?`Ajuste de stock: <strong>${lineas.join(" · ")}</strong>.`
+    :"Sin cambios de stock — solo se actualiza la etiqueta del motivo.";
 }
+function edmAplicarLocal(deltas){
+  Object.keys(deltas).forEach(pid=>{
+    const p=productos.find(x=>x.id===pid);if(!p)return;
+    if(deltas[pid].acopio)p.stock_deposito=+(((p.stock_deposito??0)+deltas[pid].acopio)).toFixed(4);
+    const desp={...(p.stock_despacho||{})};
+    Object.keys(deltas[pid].despacho).forEach(s=>{const d=deltas[pid].despacho[s];if(d)desp[s]=+(((desp[s]??0)+d)).toFixed(4);});
+    p.stock_despacho=desp;
+  });
+}
+document.getElementById("edm-buscar").addEventListener("input",(e)=>{edmPoblarProductos(e.target.value);});
+document.getElementById("edm-producto").addEventListener("change",()=>{edmPoblarMotivos();edmActualizar();});
+document.getElementById("edm-cantidad").addEventListener("input",edmActualizar);
 document.getElementById("edm-motivo").addEventListener("change",edmActualizar);
 document.getElementById("edm-sector").addEventListener("change",edmActualizar);
 document.getElementById("btn-confirmar-editar-motivo").addEventListener("click",async()=>{
@@ -571,46 +628,77 @@ document.getElementById("btn-confirmar-editar-motivo").addEventListener("click",
   const msgEl=document.getElementById("msg-editar-motivo");
   const btn=document.getElementById("btn-confirmar-editar-motivo");
   if(!m)return;
-  const prod=productos.find(p=>p.id===m.id_producto);
-  if(!prod){mostrarMsg(msgEl,"error","El producto de este movimiento ya no existe.");return;}
+  const newProd=edmProdSel();
+  if(!newProd){mostrarMsg(msgEl,"error","Elegí un producto válido.");return;}
+  const newCant=edmCant();
+  if(!(newCant>0)){mostrarMsg(msgEl,"error","La cantidad debe ser mayor a 0.");return;}
   const nuevo=document.getElementById("edm-motivo").value;
   const base=(m.motivo||"").split(" — ")[0];
   const obs=(m.motivo||"").includes(" — ")?(m.motivo||"").split(" — ").slice(1).join(" — "):"";
-  if(nuevo===base){mostrarMsg(msgEl,"error","Elegí un motivo distinto al actual.");return;}
   const origen=m.origen||"acopio";
   const newTransf=edmEsTransfNuevo();
-  const newDestino=newTransf?edmDestinoNuevo(prod,true):"consumo";
+  const newDestino=newTransf?edmDestinoNuevo(newProd,true):"consumo";
   if(newTransf&&!newDestino){mostrarMsg(msgEl,"error","El producto no tiene sector de despacho asignado.");return;}
-  const oldEf=efectoRetiro(origen,m.destino,m.cantidad);
-  const newEf=efectoRetiro(origen,newDestino,m.cantidad);
-  const nuevoAcopio=+((prod.stock_deposito??0)+(newEf.acopio-oldEf.acopio)).toFixed(4);
-  const despacho={...(prod.stock_despacho||{})};
-  new Set([...Object.keys(oldEf.despacho),...Object.keys(newEf.despacho)]).forEach(s=>{
-    despacho[s]=+((despacho[s]??0)+((newEf.despacho[s]||0)-(oldEf.despacho[s]||0))).toFixed(4);
-  });
-  // Escrituras atómicas: aplicamos los deltas con increment (no pisa cambios
-  // concurrentes en otros sectores ni el valor real del acopio).
-  const prodUpdate={};
-  const dAcopio=newEf.acopio-oldEf.acopio;
-  if(dAcopio)prodUpdate.stock_deposito=increment(dAcopio);
-  new Set([...Object.keys(oldEf.despacho),...Object.keys(newEf.despacho)]).forEach(s=>{
-    const d=(newEf.despacho[s]||0)-(oldEf.despacho[s]||0);
-    if(d)prodUpdate[`stock_despacho.${s}`]=increment(d);
-  });
+  const cambios=newProd.id!==m.id_producto||newCant!==m.cantidad||nuevo!==base||newDestino!==m.destino;
+  if(!cambios){mostrarMsg(msgEl,"error","No hiciste ningún cambio.");return;}
+  const deltas=edmDeltas(true);
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
     const batch=writeBatch(db);
-    if(Object.keys(prodUpdate).length)batch.update(doc(db,"productos",prod.id),prodUpdate);
-    batch.update(doc(db,"movimientos",m.id),{motivo:obs?`${nuevo} — ${obs}`:nuevo,destino:newDestino,corregido:true,motivo_anterior:m.motivo,fecha_correccion:serverTimestamp()});
+    Object.keys(deltas).forEach(pid=>{
+      if(!productos.some(p=>p.id===pid))return;
+      const upd={};
+      if(deltas[pid].acopio)upd.stock_deposito=increment(deltas[pid].acopio);
+      Object.keys(deltas[pid].despacho).forEach(s=>{const d=deltas[pid].despacho[s];if(d)upd[`stock_despacho.${s}`]=increment(d);});
+      if(Object.keys(upd).length)batch.update(doc(db,"productos",pid),upd);
+    });
+    batch.update(doc(db,"movimientos",m.id),{id_producto:newProd.id,nombre_producto:newProd.nombre,cantidad:newCant,unidad:newProd.unidad_medida||m.unidad||"",motivo:obs?`${nuevo} — ${obs}`:nuevo,destino:newDestino,origen,corregido:true,motivo_anterior:m.motivo,fecha_correccion:serverTimestamp()});
     await batch.commit();
-    prod.stock_deposito=nuevoAcopio;
-    prod.stock_despacho=despacho;
+    edmAplicarLocal(deltas);
+    m.id_producto=newProd.id;m.nombre_producto=newProd.nombre;m.cantidad=newCant;m.unidad=newProd.unidad_medida||m.unidad||"";
     m.motivo=obs?`${nuevo} — ${obs}`:nuevo;m.destino=newDestino;m.corregido=true;
     cerrarModal("modal-editar-motivo");
     cargarMovRecientes();renderStock();
     if(movCache.length)renderHistorial();
   }catch(err){mostrarMsg(msgEl,"error","Error: "+err.message);}
-  finally{btn.disabled=false;btn.innerHTML="Aplicar corrección";}
+  finally{btn.disabled=false;btn.innerHTML="Aplicar cambios";}
+});
+// ── ELIMINAR MOVIMIENTO ──
+document.getElementById("btn-eliminar-mov").addEventListener("click",()=>{
+  if(!edmMov)return;
+  const lineas=edmFmtDeltas(edmDeltas(false));
+  document.getElementById("edm-eliminar-preview").innerHTML=`Se eliminará este retiro y se devolverá el stock. ${lineas.length?`Ajuste: <strong>${lineas.join(" · ")}</strong>.`:""}`;
+  document.getElementById("edm-confirm-eliminar").style.display="";
+});
+document.getElementById("btn-cancelar-eliminar").addEventListener("click",()=>{
+  document.getElementById("edm-confirm-eliminar").style.display="none";
+});
+document.getElementById("btn-confirmar-eliminar").addEventListener("click",async()=>{
+  const m=edmMov;
+  const msgEl=document.getElementById("msg-editar-motivo");
+  const btn=document.getElementById("btn-confirmar-eliminar");
+  if(!m)return;
+  const deltas=edmDeltas(false);
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    const batch=writeBatch(db);
+    Object.keys(deltas).forEach(pid=>{
+      if(!productos.some(p=>p.id===pid))return;
+      const upd={};
+      if(deltas[pid].acopio)upd.stock_deposito=increment(deltas[pid].acopio);
+      Object.keys(deltas[pid].despacho).forEach(s=>{const d=deltas[pid].despacho[s];if(d)upd[`stock_despacho.${s}`]=increment(d);});
+      if(Object.keys(upd).length)batch.update(doc(db,"productos",pid),upd);
+    });
+    batch.delete(doc(db,"movimientos",m.id));
+    await batch.commit();
+    edmAplicarLocal(deltas);
+    delete movIndex[m.id];
+    movCache=movCache.filter(x=>x.id!==m.id);
+    cerrarModal("modal-editar-motivo");
+    cargarMovRecientes();renderStock();
+    if(movCache.length)renderHistorial();
+  }catch(err){mostrarMsg(msgEl,"error","Error: "+err.message);}
+  finally{btn.disabled=false;btn.innerHTML="Sí, eliminar";}
 });
 
 document.getElementById("btn-aplicar-filtros").addEventListener("click",renderHistorial);

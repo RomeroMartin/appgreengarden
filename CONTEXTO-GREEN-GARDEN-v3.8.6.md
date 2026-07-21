@@ -183,13 +183,15 @@ Setea un **valor absoluto** (no delta). Dos formas:
 - **Ajuste rápido:** un producto, eligiendo la **ubicación** (Acopio o un sector de despacho). Helpers `ubicacionesDe()`, `poblarUbicacionesAjuste()`.
 - **Conteo físico** (`conteo-fisico.js`): ajuste masivo de acopio y de cada despacho a la vez.
 
-### 7.5 Corregir motivo de un retiro (Gerente y Admin) — REVERSE + APPLY
-Botón ✏️ en el historial / movimientos recientes. **Lógica actual (reescrita):** revierte por completo el efecto real del movimiento original (según su `origen` y `destino` reales) y aplica el efecto del nuevo motivo desde cero. Implementado con:
+### 7.5 Editar / eliminar un retiro (Gerente y Admin) — REVERSE + APPLY
+Botón ✏️ en el historial / movimientos recientes abre el modal **"Editar retiro"** (`modal-editar-motivo`). Desde ahí se puede cambiar **producto, cantidad y motivo**, y **eliminar** el movimiento. Todo pasa por reverse + apply: se revierte por completo el efecto real del movimiento original (según su `id_producto`, `cantidad`, `origen` y `destino` reales) y se aplica el efecto del movimiento editado desde cero. Implementado con:
 - `esDestinoSector(x)`, `efectoRetiro(origen, destino, cantidad)` → devuelve `{acopio:Δ, despacho:{sector:Δ}}`.
-- Net = efectoNuevo − efectoViejo, aplicado al stock actual, en `writeBatch` atómico (stock del producto + el movimiento juntos).
-- Marca `corregido:true`, guarda `motivo_anterior`.
-- Para retiros que salieron de un sector de despacho, no ofrece motivos con transferencia.
-- Casos validados: Retiro para uso→Reposición (acopio igual, +sector); Reposición→Vencimiento (acopio igual, −sector); retiro desde despacho cambiando etiqueta (sin tocar stock); Reposición de un sector a otro (mueve entre sectores).
+- `edmProdSel()`, `edmCant()`, `edmPoblarProductos(filtro)` (con buscador), `edmPoblarMotivos()` (filtra por producto: materia prima o retiro-desde-despacho no ofrecen transferencia).
+- `edmDeltas(incluirApply)` → mapa `{idProducto:{acopio, despacho}}`: siempre revierte el original (−1) y, si `incluirApply`, aplica el editado (+1). Si cambia el producto, la reversión toca el producto viejo y la aplicación el nuevo (dos documentos).
+- Se aplica con `increment()` en `writeBatch` atómico (los productos afectados + el movimiento juntos). Editar marca `corregido:true` y guarda `motivo_anterior`; eliminar hace `batch.delete` del movimiento.
+- Guarda contra producto inexistente (no toca stock de un producto borrado).
+- Casos validados por simulación: cambio de cantidad (para uso y reposición), cambio de producto (acopio y retiro-desde-despacho), cambio de motivo (para uso→reposición, etc.) y eliminación (reposición y retiro-desde-despacho).
+- **Reglas Firestore:** `movimientos` `update` y `delete` habilitados para Gerente **o** Admin (antes `delete` era solo Gerente). El ajuste de stock del Admin queda dentro de `stock_deposito`/`stock_despacho`, que ya tenía permitido.
 
 ---
 
