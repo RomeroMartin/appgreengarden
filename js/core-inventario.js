@@ -84,3 +84,30 @@ export function poblarMotivosSalida(productos, motivosSalida) {
   if (lista.some(m => m.nombre === actual)) sel.value = actual;
   else if (lista.some(m => m.nombre === "Reposición")) sel.value = "Reposición";
 }
+
+// Reasegura "Reposición" como motivo de retiro (si el producto lo permite) y
+// refresca la vista. Se llama al volver a la app: si el usuario cambió de
+// pantalla en el celu (ej. fue al bloc de notas) y vuelve, el motivo no debe
+// quedar seteado en otro valor por accidente.
+export function fijarMotivoReposicion(onRefrescar) {
+  const sel = document.getElementById("sal-motivo");
+  if (sel) {
+    const tieneRepo = [...sel.options].some(o => o.value === "Reposición");
+    if (tieneRepo && sel.value !== "Reposición") sel.value = "Reposición";
+  }
+  if (typeof onRefrescar === "function") onRefrescar();
+}
+
+// Instala el "candado": cada vez que la app vuelve a estar VISIBLE (el usuario
+// volvió de otra app/pantalla) reasegura "Reposición". Usa visibilitychange y
+// el pageshow restaurado desde bfcache —NO 'focus'— para no pisar la selección
+// mientras el usuario abre el desplegable y elige un motivo a mano dentro de la
+// app (abrir un <select> nativo no dispara visibilitychange).
+export function instalarCandadoMotivoReposicion(onRefrescar) {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") fijarMotivoReposicion(onRefrescar);
+  });
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) fijarMotivoReposicion(onRefrescar);
+  });
+}

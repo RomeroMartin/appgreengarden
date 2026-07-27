@@ -7,7 +7,8 @@ import { auth, db } from "./firebase-config.js";
 import { protegerRuta, logout } from "./auth.js";
 import {
   escHtml, fmtN, esDespacho, sectoresDe, acopioBajoOcero,
-  origenRetiroActual, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida
+  origenRetiroActual, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida,
+  instalarCandadoMotivoReposicion
 } from "./core-inventario.js";
 import { icono } from "./iconos.js";
 import {
@@ -52,6 +53,8 @@ async function cargarProductos() {
   });
   document.getElementById("sal-motivo").addEventListener("change", actualizarInfo);
   actualizarInfo();
+  // Al volver a la app, reasegura "Reposición" como motivo por defecto.
+  instalarCandadoMotivoReposicion(actualizarInfo);
 }
 
 function poblarSelect(lista) {
@@ -222,7 +225,7 @@ async function cargarHoy() {
   if(!retiros.length){cont.innerHTML='<div class="empty-state"><p>Sin retiros hoy.</p></div>';return;}
   cont.innerHTML=retiros.map(d=>{
     const m=d.data();const ts=m.fecha_hora?.toDate?.();
-    const hora=ts?ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}):"";
+    const hora=ts?ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}):"";
     const destinoTxt=(m.destino==="produccion"||m.destino==="consumo")?"consumo":m.destino;
     return `<div class="mov-mini"><div><div style="font-size:0.88rem;font-weight:600;">${escHtml(m.nombre_producto)}</div><div style="font-size:0.72rem;color:var(--texto-3);">${hora} → ${escHtml(destinoTxt)} · ${escHtml(m.motivo||"—")}</div></div><span style="font-size:0.9rem;font-weight:700;color:var(--critico-txt);">-${escHtml(m.cantidad)} ${escHtml(m.unidad||"")}</span></div>`;
   }).join("");

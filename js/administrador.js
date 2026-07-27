@@ -10,7 +10,8 @@ import { renderResumen, badgeProducto, calcularResumen, debeAvanzar } from "./co
 import { initConteo, abrirConteo, setProductosConteo } from "./conteo-fisico.js";
 import {
   escHtml, fmtN, esDespacho, sectoresDe, stockTotal, getBadge, acopioBajoOcero,
-  origenRetiroActual, aDatetimeLocal, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida
+  origenRetiroActual, aDatetimeLocal, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida,
+  instalarCandadoMotivoReposicion
 } from "./core-inventario.js";
 import { icono } from "./iconos.js";
 import {
@@ -270,6 +271,9 @@ document.getElementById("btn-mov-salida").addEventListener("click",()=>{
   abrirModal("modal-salida");
 });
 
+// Al volver a la app, reasegura "Reposición" como motivo por defecto del retiro.
+instalarCandadoMotivoReposicion(actualizarInfoRetiro);
+
 document.getElementById("btn-confirmar-salida").addEventListener("click",async()=>{
   const prodId=document.getElementById("sal-producto").value;
   const cantidad=parseFloat(document.getElementById("sal-cantidad").value)||0;
@@ -444,7 +448,7 @@ const LABELS_MOV={INGRESO_PROVEEDOR:"↑ Proveedor",INGRESO_PRODUCCION:"↑ Prod
 function filaMov(m){
   const ts=m.fecha_hora?.toDate?.();
   const fecha=ts?ts.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit"}):"—";
-  const hora=ts?ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}):"";
+  const hora=ts?ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}):"";
   const color=COLORES_MOV[m.tipo]||"var(--texto-2)";
   const label=LABELS_MOV[m.tipo]||escHtml(m.tipo);
   const destinoExtra=(m.tipo==="RETIRO"&&m.destino&&m.destino!=="produccion"&&m.destino!=="consumo")?` → ${escHtml(m.destino)}`:"";
@@ -713,7 +717,7 @@ document.getElementById("btn-exportar-excel").addEventListener("click",async()=>
   const btn=document.getElementById("btn-exportar-excel");
   btn.disabled=true;btn.textContent="Generando...";
   const XLSX=await import("https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs");
-  const filas=lista.map(m=>{const ts=m.fecha_hora?.toDate?.();return{"Fecha":ts?ts.toLocaleDateString("es-AR"):"—","Hora":ts?ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}):"—","Producto":m.nombre_producto||"—","Tipo":m.tipo||"—","Cantidad":m.cantidad??0,"Unidad":m.unidad||"—","Origen":m.origen||"—","Destino":m.destino||"—","Motivo":m.motivo||"—","Usuario":m.nombre_usuario||"—"};});
+  const filas=lista.map(m=>{const ts=m.fecha_hora?.toDate?.();return{"Fecha":ts?ts.toLocaleDateString("es-AR"):"—","Hora":ts?ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}):"—","Producto":m.nombre_producto||"—","Tipo":m.tipo||"—","Cantidad":m.cantidad??0,"Unidad":m.unidad||"—","Origen":m.origen||"—","Destino":m.destino||"—","Motivo":m.motivo||"—","Usuario":m.nombre_usuario||"—"};});
   const ws=XLSX.utils.json_to_sheet(filas);ws["!cols"]=[{wch:12},{wch:8},{wch:28},{wch:20},{wch:10},{wch:10},{wch:15},{wch:15},{wch:35},{wch:20}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Historial");
   XLSX.writeFile(wb,`historial-administrador-${new Date().toLocaleDateString("es-AR").replace(/\//g,"-")}.xlsx`);

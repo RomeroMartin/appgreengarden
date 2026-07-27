@@ -112,7 +112,7 @@ async function cargarEntradasHoy() {
   const labels = { INGRESO_PROVEEDOR:"↑ Proveedor", INGRESO_PRODUCCION:"↑ Producción" };
   cont.innerHTML = hoyMovs.map(d=>{
     const m=d.data(); const ts=m.fecha_hora?.toDate?.();
-    const hora=ts?ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}):"";
+    const hora=ts?ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}):"";
     return `<div class="mov-mini"><div><div style="font-size:0.88rem;font-weight:600;">${escHtml(m.nombre_producto)}</div><div style="font-size:0.72rem;color:var(--texto-3);">${hora} · ${labels[m.tipo]||escHtml(m.tipo)} · ${escHtml(m.motivo||"—")}</div></div><span style="font-size:0.9rem;font-weight:700;color:var(--normal-txt);">+${escHtml(m.cantidad)} ${escHtml(m.unidad||"")}</span></div>`;
   }).join("");
 }

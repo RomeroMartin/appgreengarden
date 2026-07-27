@@ -7,7 +7,8 @@ import { auth, db } from "./firebase-config.js";
 import { protegerRuta, logout } from "./auth.js";
 import {
   escHtml, fmtN, esDespacho, sectoresDe, stockTotal, getBadge,
-  acopioBajoOcero, origenRetiroActual, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida
+  acopioBajoOcero, origenRetiroActual, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida,
+  instalarCandadoMotivoReposicion
 } from "./core-inventario.js";
 import { icono } from "./iconos.js";
 import {
@@ -226,6 +227,9 @@ function actualizarInfoRetiro() {
   }
 }
 
+// Al volver a la app, reasegura "Reposición" como motivo por defecto.
+instalarCandadoMotivoReposicion(actualizarInfoRetiro);
+
 document.getElementById("btn-abrir-salida").addEventListener("click",()=>{
   poblarSelect("sal-producto");
   document.getElementById("sal-busqueda").value="";
@@ -325,7 +329,7 @@ function renderMovimientos() {
   cont.innerHTML=lista.map(m=>{
     const ts=m.fecha_hora?.toDate?.();
     const fecha=ts?ts.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit"}):"—";
-    const hora=ts?ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}):"";
+    const hora=ts?ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}):"";
     const color=colores[m.tipo]||"var(--texto-2)";const label=labels[m.tipo]||escHtml(m.tipo);
     const destinoExtra=(m.tipo==="RETIRO"&&m.destino&&m.destino!=="produccion"&&m.destino!=="consumo")?` → ${escHtml(m.destino)}`:"";
     return `<div class="mov-row"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:0.9rem;font-weight:600;">${escHtml(m.nombre_producto||"—")}</span><span style="font-size:0.85rem;font-weight:700;color:${color};">${escHtml(m.cantidad)} ${escHtml(m.unidad||"")}</span></div><div style="font-size:0.75rem;color:var(--texto-3);">${fecha} ${hora} · <span style="color:${color};font-weight:600;">${label}${destinoExtra}</span> · ${escHtml(m.nombre_usuario||"—")}</div></div>`;
@@ -344,7 +348,7 @@ document.getElementById("btn-exportar-excel-enc").addEventListener("click",async
   const btn=document.getElementById("btn-exportar-excel-enc");
   btn.disabled=true;btn.textContent="Generando...";
   const XLSX=await import("https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs");
-  const filas=lista.map(m=>{const ts=m.fecha_hora?.toDate?.();return{"Fecha":ts?ts.toLocaleDateString("es-AR"):"—","Hora":ts?ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}):"—","Producto":m.nombre_producto||"—","Tipo":m.tipo||"—","Cantidad":m.cantidad??0,"Unidad":m.unidad||"—","Origen":m.origen||"—","Destino":m.destino||"—","Motivo":m.motivo||"—","Usuario":m.nombre_usuario||"—"};});
+  const filas=lista.map(m=>{const ts=m.fecha_hora?.toDate?.();return{"Fecha":ts?ts.toLocaleDateString("es-AR"):"—","Hora":ts?ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}):"—","Producto":m.nombre_producto||"—","Tipo":m.tipo||"—","Cantidad":m.cantidad??0,"Unidad":m.unidad||"—","Origen":m.origen||"—","Destino":m.destino||"—","Motivo":m.motivo||"—","Usuario":m.nombre_usuario||"—"};});
   const ws=XLSX.utils.json_to_sheet(filas);ws["!cols"]=[{wch:12},{wch:8},{wch:28},{wch:20},{wch:10},{wch:10},{wch:15},{wch:15},{wch:35},{wch:20}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Movimientos");
   XLSX.writeFile(wb,`movimientos-encargado-${new Date().toLocaleDateString("es-AR").replace(/\//g,"-")}.xlsx`);
