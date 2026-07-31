@@ -46,7 +46,7 @@ async function cargarProductos() {
   document.getElementById("sal-producto").addEventListener("change", actualizarInfo);
   document.getElementById("sal-busqueda").addEventListener("input", refrescarSelect);
   document.getElementById("sal-motivo").addEventListener("change", actualizarInfo);
-  // Al volver a la app, reasegura "Reposición" como motivo por defecto.
+  // Al volver a la app, reasegura el motivo por defecto (el primero en orden, el "1 -").
   instalarCandadoMotivoReposicion(actualizarInfo);
 
   // Stock EN VIVO: onSnapshot mantiene el cache siempre sincronizado con

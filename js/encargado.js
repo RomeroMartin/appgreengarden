@@ -227,7 +227,7 @@ function actualizarInfoRetiro() {
   }
 }
 
-// Al volver a la app, reasegura "Reposición" como motivo por defecto.
+// Al volver a la app, reasegura el motivo por defecto (el primero en orden, el "1 -").
 instalarCandadoMotivoReposicion(actualizarInfoRetiro);
 
 document.getElementById("btn-abrir-salida").addEventListener("click",()=>{

@@ -11,7 +11,7 @@ import { initConteo, abrirConteo, setProductosConteo } from "./conteo-fisico.js"
 import {
   escHtml, fmtN, esDespacho, sectoresDe, stockTotal, getBadge, acopioBajoOcero,
   origenRetiroActual, aDatetimeLocal, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida,
-  instalarCandadoMotivoReposicion
+  instalarCandadoMotivoReposicion, ordenarMotivos
 } from "./core-inventario.js";
 import { icono } from "./iconos.js";
 import {
@@ -271,7 +271,7 @@ document.getElementById("btn-mov-salida").addEventListener("click",()=>{
   abrirModal("modal-salida");
 });
 
-// Al volver a la app, reasegura "Reposición" como motivo por defecto del retiro.
+// Al volver a la app, reasegura el motivo por defecto del retiro (el primero en orden, el "1 -").
 instalarCandadoMotivoReposicion(actualizarInfoRetiro);
 
 document.getElementById("btn-confirmar-salida").addEventListener("click",async()=>{
@@ -536,6 +536,7 @@ function edmPoblarMotivos(){
   const desdeDespacho=!!(m.origen&&m.origen!=="acopio");
   let opciones=motivosSalida;
   if((prod&&!esDespacho(prod))||desdeDespacho)opciones=motivosSalida.filter(x=>!x.transfiere);
+  opciones=ordenarMotivos(opciones);
   sel.innerHTML=opciones.map(x=>`<option value="${escHtml(x.nombre)}" ${x.nombre===prev?"selected":""}>${escHtml(x.nombre)}${x.transfiere?" (→ despacho)":""}</option>`).join("");
   if(!opciones.some(x=>x.nombre===prev)&&opciones[0])sel.value=opciones[0].nombre;
 }

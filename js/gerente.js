@@ -12,7 +12,7 @@ import { initConteo, abrirConteo, setProductosConteo } from "./conteo-fisico.js"
 import {
   escHtml, fmtN, esDespacho, esReceta, sectoresDe, stockTotal, getBadge, acopioBajoOcero,
   origenRetiroActual, aDatetimeLocal, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida,
-  instalarCandadoMotivoReposicion
+  instalarCandadoMotivoReposicion, ordenarMotivos
 } from "./core-inventario.js";
 import { icono } from "./iconos.js";
 import {
@@ -199,7 +199,7 @@ function escucharMotivosSalida() {
 function renderMotivosSalida() {
   const cont = document.getElementById("lista-motivos");
   if (!cont) return;
-  cont.innerHTML = motivosSalida.map(m => `
+  cont.innerHTML = ordenarMotivos(motivosSalida).map(m => `
     <div class="config-item">
       <span>${escHtml(m.nombre)} ${m.transfiere ? '<span style="font-size:0.65rem;background:var(--verde-claro);color:var(--verde);padding:2px 8px;border-radius:10px;font-weight:600;">→ despacho</span>' : ""}</span>
       ${m.id ? `<button class="btn-icono danger" onclick="eliminarItem('motivos_salida','${m.id}','${escJs(m.nombre)}')">${icono("eliminar",{size:16})}</button>` : ""}
@@ -902,7 +902,7 @@ document.getElementById("btn-mov-salida").addEventListener("click", () => {
   abrirModal("modal-salida");
 });
 
-// Al volver a la app, reasegura "Reposición" como motivo por defecto del retiro.
+// Al volver a la app, reasegura el motivo por defecto del retiro (el primero en orden, el "1 -").
 instalarCandadoMotivoReposicion(actualizarInfoRetiro);
 
 document.getElementById("btn-confirmar-salida").addEventListener("click", async () => {
@@ -1137,6 +1137,7 @@ function edmPoblarMotivos() {
   // Materia prima o retiro desde despacho: no se puede reponer → solo motivos sin transferencia
   let opciones = motivosSalida;
   if ((prod && !esDespacho(prod)) || desdeDespacho) opciones = motivosSalida.filter(x => !x.transfiere);
+  opciones = ordenarMotivos(opciones);
   sel.innerHTML = opciones.map(x => `<option value="${escHtml(x.nombre)}" ${x.nombre===prev?"selected":""}>${escHtml(x.nombre)}${x.transfiere?" (→ despacho)":""}</option>`).join("");
   if (!opciones.some(x => x.nombre === prev) && opciones[0]) sel.value = opciones[0].nombre;
 }
