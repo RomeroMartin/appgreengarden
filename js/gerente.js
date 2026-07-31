@@ -678,21 +678,25 @@ document.getElementById("btn-guardar-producto").addEventListener("click", async 
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
     if (id) {
-      // Editar: actualizar datos y sincronizar mapa de despacho sin pisar stocks existentes
-      const prodActual = productos.find(x => x.id === id);
-      const despachoActual = prodActual?.stock_despacho ?? {};
-      const nuevoDespacho = {};
-      if (tipo === "Despacho") {
-        seleccionados.forEach(s => { nuevoDespacho[s] = despachoActual[s] ?? 0; });
-      }
-      await updateDoc(doc(db, "productos", id), {
+      // Editar: actualizar SOLO metadatos y sectores asignados. NUNCA reescribir
+      // el mapa stock_despacho: ese stock lo administran EXCLUSIVAMENTE los
+      // movimientos (reposición, venta, conteo, ajuste) con increments/escrituras
+      // por sector. Antes se reconstruía el mapa entero desde el cache local y se
+      // guardaba absoluto → si el cache estaba un instante atrasado, una
+      // reposición recién hecha (ej. 10 a Barra) se PISABA con 0 y desaparecía.
+      // Los sectores nuevos se autocompletan en 0 en su primera operación (todas
+      // las lecturas usan `?? 0`); un sector que se desasigna conserva su stock en
+      // la base (mejor que borrarlo en silencio).
+      const update = {
         nombre, plu, rubro, sector, unidad_medida: unidad, tipo,
         sectores_asignados: tipo === "Despacho" ? seleccionados : [],
-        stock_despacho: nuevoDespacho,
         ...minData,
         ...fraccionData,
         ...datosReceta
-      });
+      };
+      // Si el producto deja de ser de Despacho, su mapa de despacho ya no aplica.
+      if (tipo !== "Despacho") update.stock_despacho = {};
+      await updateDoc(doc(db, "productos", id), update);
     } else {
       const despachoInit = {};
       if (tipo === "Despacho") seleccionados.forEach(s => { despachoInit[s] = 0; });
@@ -1598,10 +1602,10 @@ document.getElementById("btn-confirmar-ajuste").addEventListener("click", async 
     lugar = "acopio";
   } else {
     const sector = ubic.slice(5); // saca "desp:"
-    const desp = { ...(prod.stock_despacho || {}) };
-    stockAnterior = desp[sector] ?? 0;
-    desp[sector] = nuevoStock;
-    update = { stock_despacho: desp };
+    stockAnterior = prod.stock_despacho?.[sector] ?? 0;
+    // Escribe SOLO el sector ajustado (field path), sin reescribir el mapa
+    // entero → no pisa el stock de otros sectores si el cache está atrasado.
+    update = { [`stock_despacho.${sector}`]: nuevoStock };
     lugar = sector;
   }
 

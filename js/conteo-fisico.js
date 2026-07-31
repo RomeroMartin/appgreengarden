@@ -122,10 +122,12 @@ async function aplicar() {
         }
       }
       if (Object.keys(c.despacho).length) {
-        const nuevoDesp = { ...(prod.stock_despacho || {}) };
+        // Escribe SOLO los sectores contados (field paths), sin reescribir el mapa
+        // entero → no pisa el stock de sectores que no se contaron si el cache
+        // está atrasado.
         for (const s in c.despacho) {
-          const anterior = nuevoDesp[s] ?? 0;
-          nuevoDesp[s] = c.despacho[s];
+          const anterior = prod.stock_despacho?.[s] ?? 0;
+          update[`stock_despacho.${s}`] = c.despacho[s];
           if (c.despacho[s] !== anterior) {
             await addDoc(collection(db, "movimientos"), {
               fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
@@ -135,7 +137,6 @@ async function aplicar() {
             });
           }
         }
-        update.stock_despacho = nuevoDesp;
       }
       await updateDoc(doc(db, "productos", id), update);
       cuenta++;

@@ -430,7 +430,9 @@ document.getElementById("btn-confirmar-ajuste").addEventListener("click",async()
   if(!motivo){mostrarMsg(msgEl,"error","El motivo es obligatorio.");return;}
   let stockAnterior,update,lugar;
   if(ubic==="acopio"){stockAnterior=prod.stock_deposito??0;update={stock_deposito:nuevoStock};lugar="acopio";}
-  else{const sector=ubic.slice(5);const desp={...(prod.stock_despacho||{})};stockAnterior=desp[sector]??0;desp[sector]=nuevoStock;update={stock_despacho:desp};lugar=sector;}
+  // Escribe SOLO el sector ajustado (field path), sin reescribir el mapa entero
+  // → no pisa el stock de otros sectores si el cache está atrasado.
+  else{const sector=ubic.slice(5);stockAnterior=prod.stock_despacho?.[sector]??0;update={[`stock_despacho.${sector}`]:nuevoStock};lugar=sector;}
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
     await updateDoc(doc(db,"productos",prodId),update);
