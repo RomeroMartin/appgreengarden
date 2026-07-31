@@ -4,7 +4,7 @@
 // El sello se auto-estiliza (no depende de estilos.css).
 // ============================================================
 
-export const APP_VERSION = "3.8.7";
+export const APP_VERSION = "3.8.8";
 
 function aplicarVersion() {
   // Fuente única del sello de versión. Si la página no trae un .app-version,
