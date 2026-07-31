@@ -12,7 +12,7 @@ import {
 } from "./core-inventario.js";
 import { icono } from "./iconos.js";
 import {
-  collection, doc, addDoc, updateDoc, getDocs,
+  collection, doc, addDoc, updateDoc, getDocs, onSnapshot,
   query, orderBy, limit, where, serverTimestamp, writeBatch, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -36,25 +36,42 @@ document.addEventListener("usuarioListo", async (e) => {
 document.getElementById("btn-logout").addEventListener("click", logout);
 
 async function cargarProductos() {
-  const snap = await getDocs(query(collection(db,"productos"), orderBy("nombre")));
-  productos  = snap.docs.map(d => ({ id:d.id, ...d.data() }));
   try {
     const snapM = await getDocs(collection(db,"motivos_salida"));
     const listaM = snapM.docs.map(d => ({ id:d.id, ...d.data() }));
     if (listaM.length) motivosSalida = listaM;
   } catch(e) { /* usa defaults */ }
 
-  poblarSelect(productos);
+  // Listeners (se registran una sola vez).
   document.getElementById("sal-producto").addEventListener("change", actualizarInfo);
-  document.getElementById("sal-busqueda").addEventListener("input", () => {
-    const t = document.getElementById("sal-busqueda").value.toLowerCase();
-    poblarSelect(t ? productos.filter(p=>p.nombre.toLowerCase().includes(t)) : productos);
-    actualizarInfo();
-  });
+  document.getElementById("sal-busqueda").addEventListener("input", refrescarSelect);
   document.getElementById("sal-motivo").addEventListener("change", actualizarInfo);
-  actualizarInfo();
   // Al volver a la app, reasegura "Reposición" como motivo por defecto.
   instalarCandadoMotivoReposicion(actualizarInfo);
+
+  // Stock EN VIVO: onSnapshot mantiene el cache siempre sincronizado con
+  // Firestore. Así el Cargador de Salidas ve al instante las entradas/ventas
+  // hechas desde otros dispositivos SIN recargar la página. Antes se usaba
+  // getDocs una sola vez → el stock quedaba congelado desde que se abría la
+  // pantalla y un retiro perfectamente válido podía rebotar con "stock cero"
+  // (ej.: el Cargador de Entradas cargó mercadería que este panel nunca vio).
+  onSnapshot(query(collection(db,"productos"), orderBy("nombre")), (snap) => {
+    productos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    refrescarSelect();
+  });
+}
+
+// Repuebla el <select> de productos respetando el filtro de búsqueda actual y
+// conservando la selección del usuario (los <option> se identifican por id, que
+// no cambia entre snapshots). Refresca además el stock mostrado.
+function refrescarSelect() {
+  const sel  = document.getElementById("sal-producto");
+  const prev = sel.value;
+  const t    = document.getElementById("sal-busqueda").value.toLowerCase();
+  const lista = t ? productos.filter(p=>p.nombre.toLowerCase().includes(t)) : productos;
+  poblarSelect(lista);
+  if (prev && lista.some(p=>p.id===prev)) sel.value = prev;
+  actualizarInfo();
 }
 
 function poblarSelect(lista) {

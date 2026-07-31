@@ -7,7 +7,7 @@ import { auth, db } from "./firebase-config.js";
 import { protegerRuta, logout } from "./auth.js";
 import { escHtml } from "./core-inventario.js";
 import {
-  collection, doc, addDoc, updateDoc, getDocs,
+  collection, doc, addDoc, updateDoc, getDocs, onSnapshot,
   query, orderBy, limit, where, serverTimestamp, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -28,23 +28,29 @@ document.addEventListener("usuarioListo", async (e) => {
 document.getElementById("btn-logout").addEventListener("click", logout);
 
 async function cargarProductos() {
-  const snap = await getDocs(query(collection(db,"productos"), orderBy("nombre")));
-  productos  = snap.docs.map(d => ({ id:d.id, ...d.data() }));
   const sel  = document.getElementById("ent-producto");
   const busq = document.getElementById("ent-busqueda");
 
-  const poblar = (lista) => {
+  // Repuebla el <select> respetando la búsqueda y conservando la selección
+  // (los <option> se identifican por id, que no cambia entre snapshots).
+  const refrescar = () => {
+    const prev = sel.value;
+    const t    = busq.value.toLowerCase();
+    const lista = t ? productos.filter(p=>p.nombre.toLowerCase().includes(t)) : productos;
     sel.innerHTML = lista.length ? lista.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join("") : '<option value="">Sin resultados</option>';
+    if (prev && lista.some(p=>p.id===prev)) sel.value = prev;
     actualizarInfo();
   };
 
-  poblar(productos);
   sel.addEventListener("change", actualizarInfo);
-  busq.addEventListener("input", () => {
-    const t = busq.value.toLowerCase();
-    poblar(t ? productos.filter(p=>p.nombre.toLowerCase().includes(t)) : productos);
-  });
+  busq.addEventListener("input", refrescar);
 
+  // Stock EN VIVO: onSnapshot mantiene el "Stock actual" mostrado siempre
+  // sincronizado con Firestore (antes: getDocs una sola vez → quedaba congelado).
+  onSnapshot(query(collection(db,"productos"), orderBy("nombre")), (snap) => {
+    productos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    refrescar();
+  });
 }
 
 function actualizarInfo() {
