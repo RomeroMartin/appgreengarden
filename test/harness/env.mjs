@@ -106,14 +106,32 @@ export async function click(id) {
   await flush();
 }
 
-// Simula subir un Excel: inyecta las filas y dispara el change del <input file>
+// Simula subir un Excel: inyecta las filas y dispara el change del <input file>.
+// manejarArchivo es async (hace `await import(xlsx)`), así que esperamos a que el
+// preview (paso 2) aparezca o a que salga un error, en vez de un nº fijo de ticks.
 export async function uploadExcel(inputId, rows) {
   globalThis.__XLSX_ROWS = rows;
   const el = byId(inputId);
   const fakeFile = { name: "ventas.xlsx", arrayBuffer: async () => new ArrayBuffer(8) };
   Object.defineProperty(el, "files", { value: [fakeFile], configurable: true });
   el.dispatchEvent(new _dom.window.Event("change", { bubbles: true }));
-  await flush(10);
+  const listo = () => {
+    const paso2 = byId("import-paso-2");
+    const msg = byId("msg-import");
+    return (paso2 && paso2.style.display !== "none") ||
+           (msg && msg.classList.contains("msg-error"));
+  };
+  for (let i = 0; i < 60 && !listo(); i++) await new Promise(r => setTimeout(r, 0));
+  await flush(2);
 }
 
 export const setConfirm = (v) => { globalThis.__CONFIRM__ = v; };
+
+// Acceso al window de jsdom (para invocar funciones colgadas en window.*,
+// p. ej. window.abrirEditarMotivo) y esperar.
+export const win = () => _dom.window;
+export async function callGlobal(name, ...args) {
+  const r = _dom.window[name]?.(...args);
+  await flush();
+  return r;
+}

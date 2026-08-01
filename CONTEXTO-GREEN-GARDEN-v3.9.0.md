@@ -1,4 +1,4 @@
-# CONTEXTO COMPLETO — Green Garden Inventario (v3.8.6)
+# CONTEXTO COMPLETO — Green Garden Inventario (v3.9.0)
 
 > Pegá este documento al iniciar una conversación nueva. Resume TODO el proyecto: qué es, cómo está hecho técnicamente, la lógica de negocio, la UX/UI, el estado actual y lo que queda pendiente. Está escrito para que una instancia nueva de Claude entienda el proyecto sin necesidad de la conversación anterior.
 
@@ -73,6 +73,12 @@ green-garden/
 │   ├── importador-ventas.js← importación de ventas desde Excel (módulo compartido gerente/admin)
 │   ├── conteo-fisico.js    ← conteo físico / ajuste masivo (módulo compartido)
 │   └── corte-ventas.js     ← control de "ventas cargadas hasta" (módulo compartido)
+├── test/
+│   ├── corte-ventas.test.js   ← unit (node --test)
+│   ├── e2e/*.test.mjs         ← simulador E2E de cada vista
+│   ├── harness/               ← Firebase falso + loader + jsdom (ver sección 16)
+│   └── README.md
+├── package.json            ← scripts test/test:unit/test:e2e; jsdom devDependency
 └── manual-green-garden-v3.8.html  ← manual de usuario branded (imprimible a PDF)
 ```
 
@@ -176,12 +182,13 @@ Saca del acopio. El efecto depende del **motivo**:
 ### 7.3 Venta (solo Gerente y Admin)
 Descuenta del **despacho**. Dos vías:
 - **Manual:** valida stock y recorta a 0 (`Math.max(0,...)`).
-- **Importación Excel** (`importador-ventas.js`): matchea por **PLU**, lee el período del reporte, y descuenta. **Permite stock negativo** a propósito (señal de "se vendió algo que no se repuso al despacho"). Para **recetas**, descuenta los ingredientes (en unidad base) del sector de la receta; para **recetas con variantes**, matchea la variante por la columna **"Tamanio"** del Excel (normalizada: trim + uppercase).
+- **Importación Excel** (`importador-ventas.js`): matchea por **PLU**, lee el período del reporte, y descuenta con `increment()` **atómico** (agrega los deltas por producto/sector antes de escribir → un solo `increment` por campo, no se pisa con operaciones concurrentes ni se duplica si un PLU aparece en varias filas). **Permite stock negativo** a propósito (señal de "se vendió algo que no se repuso al despacho"). Para **recetas**, descuenta los ingredientes (en unidad base) del sector de la receta; para **recetas con variantes**, matchea la variante por la columna **"Tamanio"** del Excel (normalizada: trim + uppercase).
+  - **Guarda anti-doble-importación (v3.9):** antes de descontar, detecta **solapamiento** con lo ya cargado usando el `ventas_hasta` por producto y el período **desde/hasta** del reporte. Si el archivo (o un período que pisa lo ya cargado) ya se importó, **pide confirmación explícita** antes de volver a descontar. Evita el faltante por reimportar el mismo Excel. Limitación: un período nuevo pero parcialmente solapado se avisa, pero si se confirma sigue descontando el tramo repetido (haría falta ventas por día, que el reporte no trae).
 
 ### 7.4 Ajuste de inventario (solo Gerente y Admin)
-Setea un **valor absoluto** (no delta). Dos formas:
-- **Ajuste rápido:** un producto, eligiendo la **ubicación** (Acopio o un sector de despacho). Helpers `ubicacionesDe()`, `poblarUbicacionesAjuste()`.
-- **Conteo físico** (`conteo-fisico.js`): ajuste masivo de acopio y de cada despacho a la vez.
+Aplica la **DIFERENCIA** entre lo contado y lo mostrado con `increment()` (v3.9; antes escribía el valor absoluto). Así el ajuste **compone** con ventas/reposiciones/importaciones concurrentes en vez de pisarlas: si veo 8, cuento 10 (Δ +2) y mientras tanto se vendió 1, el resultado final es 8−1+2 = 9 (correcto), no 10 (que perdería la venta). El resto del sistema ya usaba `increment`; el ajuste era el único que escribía absoluto y por eso era la causa probable de las inconsistencias de stock. Dos formas:
+- **Ajuste rápido:** un producto, eligiendo la **ubicación** (Acopio o un sector de despacho). Escribe `stock_deposito: increment(nuevo − anterior)` o `stock_despacho.<sector>: increment(...)`. Helpers `ubicacionesDe()`, `poblarUbicacionesAjuste()`.
+- **Conteo físico** (`conteo-fisico.js`): ajuste masivo de acopio y de cada despacho a la vez, también con `increment` del delta. La foto se toma al abrir la pantalla; como aplica deltas, un movimiento concurrente que entre mientras se cuenta ya no se borra. Si lo contado coincide con lo mostrado, no escribe.
 
 ### 7.5 Editar / eliminar un retiro (Gerente y Admin) — REVERSE + APPLY
 Botón ✏️ en el historial / movimientos recientes abre el modal **"Editar retiro"** (`modal-editar-motivo`). Desde ahí se puede cambiar **producto, cantidad y motivo**, y **eliminar** el movimiento. Todo pasa por reverse + apply: se revierte por completo el efecto real del movimiento original (según su `id_producto`, `cantidad`, `origen` y `destino` reales) y se aplica el efecto del movimiento editado desde cero. Implementado con:
@@ -260,9 +267,8 @@ Lleva, por cada producto de despacho, hasta qué fecha están cargadas sus venta
 
 ## 12. VERSIONADO
 
-- Fuente única: `js/version.js` → `export const APP_VERSION = "3.8.6"` + inyecta la pastillita en cualquier `.app-version`.
-- **Además**, por el quirk de deploy (archivos nuevos), cada panel JS (gerente, administrador, encargado, entradas, salidas) y el `index.html` tienen un **IIFE autocontenido** al final que crea/estiliza la pastillita con la versión **hardcodeada** ("v3.8.6"). Así el sello aparece aunque `version.js` no se haya deployado.
-- **Para subir de versión:** `sed -i 's/v3.8.6/v3.8.7/g'` en `js/{gerente,administrador,encargado,entradas,salidas}.js` e `index.html`, y actualizar `APP_VERSION` en `version.js`. (El número está hardcodeado en ~6 lugares; conviene cambiarlo en todos de una pasada.)
+- Fuente **única**: `js/version.js` → `export const APP_VERSION = "3.9.0"` + inyecta la pastillita en cualquier `.app-version` (y la crea si no existe). Está incluido con `<script type="module" src=".../version.js">` en las 5 vistas y en `index.html`.
+- Ya **no** hay IIFEs con la versión hardcodeada en cada panel (se removieron): para subir de versión alcanza con cambiar `APP_VERSION` en `js/version.js`. Asegurarse de deployar ese archivo (ver quirk de deploy).
 
 ---
 
@@ -270,7 +276,7 @@ Lleva, por cada producto de despacho, hasta qué fecha están cargadas sus venta
 
 1. Trabajar en `/home/claude/green-garden`.
 2. Tras cada edición de JS: `node --check js/<archivo>.js`.
-3. Para lógica de stock delicada, **simular con node** antes de entregar (se hizo con corregir-motivo y con la conversión de fracciones).
+3. Para lógica de stock delicada, **correr `npm test`** (y agregar/actualizar tests en `test/e2e/`). Es la red de seguridad principal; ver sección 16.
 4. Subir el sello de versión.
 5. Reempaquetar a `/mnt/user-data/outputs/` (incluir el manual dentro: `cp manual-green-garden-v3.8.html green-garden/` antes de zipear) y `present_files`.
 6. Recordarle a Martín: pisar la carpeta `js` completa + las vistas tocadas, y hard refresh.
@@ -278,34 +284,61 @@ Lleva, por cada producto de despacho, hasta qué fecha están cargadas sus venta
 
 ---
 
-## 14. ESTADO ACTUAL (v3.8.6) — qué se hizo recientemente
+## 14. ESTADO ACTUAL (v3.9.0) — qué se hizo recientemente
 
-- Recetas con ingredientes de **cualquier** producto (no solo materia prima) + variantes por tamaño.
+**v3.9.0 (auditoría de stock + tests):**
+- **Ajustes atómicos:** ajuste rápido y conteo físico pasan de escribir valor absoluto a aplicar el **delta con `increment()`** → dejan de pisar ventas/reposiciones concurrentes (era la causa probable de las inconsistencias de stock).
+- **Guarda anti-doble-importación:** el importador detecta solapamiento de período (por `ventas_hasta` + desde/hasta del reporte) y pide confirmación antes de re-descontar.
+- **Suite de tests** (`npm test`): unit + un simulador E2E que ejecuta el código real de las 5 vistas sobre jsdom contra un Firebase falso (ver sección 17).
+
+**Antes (v3.8.x):**
+- Recetas con ingredientes de **cualquier** producto + variantes por tamaño.
 - Ajuste de inventario por **ubicación** (acopio o sector).
-- **Corregir motivo** reescrito a reverse+apply (atómico, contempla origen).
+- **Corregir/eliminar retiro** con reverse+apply (atómico, contempla origen).
 - **Fracciones/rendimiento** para ingredientes (entrada en ml → guarda base).
 - **Redondeo de display** con `fmtN()` (valor real intacto).
 - **Retiro desde despacho** habilitado para Cargador de Salidas y Encargado.
 - Panel **bajo mínimo colapsable** (gerente y admin).
-- **Buscador** en el desplegable de productos del editor de receta.
-- **Fix** filtro de historial: ahora filtra solo por rango de fechas (era bug de huso horario en el "hasta"; se parsea en hora local con `+"T00:00:00"` / `+"T23:59:59"`).
 
 ---
 
-## 15. PENDIENTES / DEUDA TÉCNICA (de la auditoría de movimientos)
+## 15. PENDIENTES / DEUDA TÉCNICA
 
-Ordenados por prioridad. Ninguno es bloqueante; la app es sólida.
+### ✅ Resueltos en v3.9.0
+1. **Atomicidad / condición de carrera** — RESUELTO. **Todas** las operaciones de stock usan `increment()` atómico (entradas, retiros/transferencias, ventas manuales, importación, descuento de ingredientes, editar/eliminar movimientos y **los dos ajustes**). El ajuste rápido y el conteo físico eran los únicos que escribían absoluto y pisaban cambios concurrentes; ahora aplican el delta.
+2. **Doble importación** — RESUELTO. Guarda anti-solapamiento en el importador (ver 7.3).
 
-1. **🟡 Atomicidad (condición de carrera):** casi todas las operaciones leen el stock del cache local y escriben valor absoluto. Con `onSnapshot` la ventana es chica, pero si dos dispositivos tocan el mismo producto a la vez, una actualización puede perderse. **Recomendación pendiente:** usar `increment()` de Firestore para los deltas (entradas, retiros, ventas, descuento de ingredientes). El más expuesto: importar ventas mientras otro repone el mismo producto.
-2. **🟡 Inconsistencia de recorte:** venta manual y retiros usan `Math.max(0,...)` (recortan a 0); el importador permite negativo (señal útil). Decisión pendiente: unificar criterio (recomendado: permitir negativo en ventas también).
-3. **🟢 Conteo físico:** registra el movimiento y actualiza el stock en dos escrituras separadas (no en batch) → si falla una, queda inconsistente. Conviene agruparlas en `writeBatch`.
-4. **🟢 `id_usuario` inconsistente:** importador y conteo usan `_usuarioActual.uid`; los cargadores usan `auth.currentUser?.uid`.
-5. **🟢 Venta de receta:** no deja un movimiento del trago en sí, solo de cada ingrediente (no hay línea "se vendieron 5 gin tonic" en el historial).
-6. **🟢 Rendimiento:** cambiar el rendimiento de un producto no recalcula automáticamente las recetas que lo usan (hay que reabrir y guardar).
+### Pendientes (ninguno bloqueante)
+- **🟡 Inconsistencia de recorte:** venta manual y retiros usan `Math.max(0,...)` (recortan a 0); el importador permite negativo (señal útil). Decisión pendiente: unificar criterio (recomendado: permitir negativo en ventas también).
+- **🟢 Conteo físico:** el stock ya va con `increment`, pero el movimiento de historial se registra en un `addDoc` aparte (no en el mismo batch que el update). Riesgo bajo.
+- **🟢 `id_usuario` inconsistente:** importador y conteo usan `_usuarioActual`/`auth.currentUser`; los cargadores usan `auth.currentUser?.uid`.
+- **🟢 Venta de receta:** no deja un movimiento del trago en sí, solo de cada ingrediente (no hay línea "se vendieron 5 gin tonic" en el historial).
+- **🟢 Rendimiento:** cambiar el rendimiento de un producto no recalcula automáticamente las recetas que lo usan (hay que reabrir y guardar).
+- **🟢 UX menor (editar retiro):** al reabrir el modal de "editar retiro" para OTRO movimiento, el `<select>` de motivo conserva el valor del anterior (`prev = sel.value || m.motivo`); si el motivo previo es válido para el nuevo producto, queda seleccionado en vez del motivo real del movimiento. Conviene inicializarlo siempre con `m.motivo`.
 
 ---
 
-## 16. DATOS DE CONTACTO / SOPORTE (Martin Romero Studio)
+## 16. TESTS Y SIMULADOR DE VISTAS (v3.9.0)
+
+Hay una suite de tests que corre **sin navegador ni Firebase real** con `npm test` (unit + e2e). Sirve como red de seguridad para cambios futuros.
+
+```bash
+npm test          # 62 tests (9 unit + 53 e2e)
+npm run test:unit # lógica de fechas del corte de ventas
+npm run test:e2e  # simulador de las 5 vistas
+```
+
+**Simulador E2E** (`test/e2e/*.test.mjs` + `test/harness/`): ejecuta el **código real** de cada vista (`js/<vista>.js` + `vistas/<vista>.html`) sobre **jsdom**, contra un **Firestore falso en memoria** (`test/harness/store.mjs`) con semántica real de `increment()`, field-paths, `serverTimestamp`, `writeBatch` y `onSnapshot` de tiempo real. Un **loader de Node** (`test/harness/hooks.mjs` + `register.mjs`) intercepta las URLs del SDK de Firebase y de SheetJS y las apunta a mocks. `test/harness/env.mjs` monta la vista, siembra un catálogo, simula el login y expone helpers (`click`, `setSelect`, `setValue`, `uploadExcel`, …).
+
+Cubre las 5 vistas y toda la lógica de stock: entradas, retiros/transferencias, ventas, ajuste rápido, conteo físico (incluyendo que no pierde movimientos concurrentes), importación con todos sus casos borde (PLU inexistente, multi-sector, dedup, recetas por variantes, guarda anti-doble), editar/eliminar movimientos, CRUD de productos y de configuración (rubros/sectores/motivos/usuarios) y validaciones.
+
+- **`jsdom`** es `devDependency` (solo para tests). No se publica: `firebase.json` ignora `test/` y `node_modules/`.
+- El e2e corre en serie (`--test-concurrency=1`) para que las ventanas async sean deterministas.
+- Guía para extender: `test/README.md`.
+
+---
+
+## 17. DATOS DE CONTACTO / SOPORTE (Martin Romero Studio)
 - Web: martinromerostudio.com.ar
 - Email: contacto@martinromerostudio.com.ar
 - WhatsApp: +54 9 221 435-8401
@@ -313,4 +346,4 @@ Ordenados por prioridad. Ninguno es bloqueante; la app es sólida.
 
 ---
 
-*Fin del contexto. La app está en v3.8.6, operativa y deployada. Para continuar: pedir el ZIP actual o reconstruir desde el último entregado, trabajar en `/home/claude/green-garden`, y seguir las convenciones de la sección 13.*
+*Fin del contexto. La app está en v3.9.0, operativa y deployada. Para continuar: trabajar sobre el repo, correr `npm test` ante cualquier cambio de stock, y seguir las convenciones de la sección 13.*
