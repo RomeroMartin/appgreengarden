@@ -4,6 +4,11 @@
   "type": "module",
   "description": "Sistema de inventario Green Garden (web app Firebase).",
   "scripts": {
-    "test": "node --test"
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --test test/corte-ventas.test.js",
+    "test:e2e": "node --import ./test/harness/register.mjs --test \"test/e2e/*.test.mjs\""
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1"
   }
 }
