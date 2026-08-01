@@ -6,7 +6,7 @@
 
 import { auth, db } from "./firebase-config.js";
 import {
-  collection, doc, getDocs, updateDoc, addDoc, serverTimestamp
+  collection, doc, getDocs, updateDoc, addDoc, serverTimestamp, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const esDespacho = p => p.tipo === "Despacho";
@@ -108,11 +108,16 @@ async function aplicar() {
     for (const id of ids) {
       const prod = _productos.find(p => p.id === id);
       const c = cambios[id];
+      // Se aplica la DIFERENCIA (conteo − valor mostrado) con increment, NO el
+      // valor absoluto. El conteo parte de una foto tomada al abrir la pantalla;
+      // si mientras se cuenta entran ventas/reposiciones, un write absoluto las
+      // BORRABA. Con increment el ajuste corrige solo la diferencia y compone con
+      // esos movimientos (igual que entradas/salidas/importación).
       const update = {};
       if (c.acopio !== undefined) {
         const anterior = prod.stock_deposito ?? 0;
-        update.stock_deposito = c.acopio;
         if (c.acopio !== anterior) {
+          update.stock_deposito = increment(c.acopio - anterior);
           await addDoc(collection(db, "movimientos"), {
             fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
             nombre_usuario: _usuarioActual.nombre, id_producto: id, nombre_producto: prod.nombre,
@@ -122,13 +127,11 @@ async function aplicar() {
         }
       }
       if (Object.keys(c.despacho).length) {
-        // Escribe SOLO los sectores contados (field paths), sin reescribir el mapa
-        // entero → no pisa el stock de sectores que no se contaron si el cache
-        // está atrasado.
+        // Toca SOLO los sectores contados (field paths), sin reescribir el mapa entero.
         for (const s in c.despacho) {
           const anterior = prod.stock_despacho?.[s] ?? 0;
-          update[`stock_despacho.${s}`] = c.despacho[s];
           if (c.despacho[s] !== anterior) {
+            update[`stock_despacho.${s}`] = increment(c.despacho[s] - anterior);
             await addDoc(collection(db, "movimientos"), {
               fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
               nombre_usuario: _usuarioActual.nombre, id_producto: id, nombre_producto: prod.nombre,
@@ -138,8 +141,11 @@ async function aplicar() {
           }
         }
       }
-      await updateDoc(doc(db, "productos", id), update);
-      cuenta++;
+      // Puede quedar vacío si lo contado coincide con lo mostrado → no se escribe.
+      if (Object.keys(update).length) {
+        await updateDoc(doc(db, "productos", id), update);
+        cuenta++;
+      }
     }
     mostrar(msgEl,"ok",`✓ Conteo aplicado a ${cuenta} producto(s).`);
     _onAplicado();

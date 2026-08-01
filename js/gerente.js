@@ -1598,16 +1598,22 @@ document.getElementById("btn-confirmar-ajuste").addEventListener("click", async 
   let stockAnterior, update, lugar;
   if (ubic === "acopio") {
     stockAnterior = prod.stock_deposito ?? 0;
-    update = { stock_deposito: nuevoStock };
     lugar = "acopio";
   } else {
     const sector = ubic.slice(5); // saca "desp:"
     stockAnterior = prod.stock_despacho?.[sector] ?? 0;
-    // Escribe SOLO el sector ajustado (field path), sin reescribir el mapa
-    // entero → no pisa el stock de otros sectores si el cache está atrasado.
-    update = { [`stock_despacho.${sector}`]: nuevoStock };
     lugar = sector;
   }
+  // Se aplica la DIFERENCIA con increment (no el valor absoluto): así el ajuste
+  // COMPONE con cualquier venta/reposición/importación concurrente en vez de
+  // pisarla. Ej.: veo 8, cuento 10 (Δ +2); si mientras tanto se vendió 1, el
+  // resultado final es 8-1+2 = 9 (correcto), no 10 (que perdería la venta).
+  // El resto del sistema (entradas/salidas/importación) ya usa increment; el
+  // ajuste era el único que escribía absoluto y por eso pisaba movimientos.
+  const delta = nuevoStock - stockAnterior;
+  update = (ubic === "acopio")
+    ? { stock_deposito: increment(delta) }
+    : { [`stock_despacho.${lugar}`]: increment(delta) };
 
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
