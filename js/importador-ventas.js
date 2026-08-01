@@ -5,7 +5,7 @@
 // ============================================================
 
 import { auth, db } from "./firebase-config.js";
-import { debeAvanzar } from "./corte-ventas.js";
+import { debeAvanzar, ventasHastaDe } from "./corte-ventas.js";
 import { icono } from "./iconos.js";
 import {
   collection, doc, addDoc, getDocs, query, orderBy,
@@ -16,7 +16,8 @@ import {
 let _productos      = [];
 let _usuarioActual  = null;
 let _filasPreview   = [];   // [{prod, cantidad, sectorElegido, sectores}]
-let _fechaCorte     = null; // Date "hasta" leída del Excel
+let _fechaCorte     = null; // Date "hasta" del período (fin) leída del Excel
+let _fechaDesde     = null; // Date "desde" del período (inicio), para detectar solapamientos
 let _onTerminado    = null;
 
 // Helpers de tipo
@@ -87,7 +88,9 @@ async function manejarArchivo(e) {
     // Matriz de filas (array de arrays), sin encabezados
     const filas = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
 
-    _fechaCorte = extraerFechaCorte(filas, XLSX);
+    const periodo = extraerFechaCorte(filas, XLSX);
+    _fechaCorte = periodo.hasta;
+    _fechaDesde = periodo.desde;
     const parsed = parsearFilas(filas);
     if (!parsed.length) {
       msgEl.className = "msg show msg-error";
@@ -101,20 +104,23 @@ async function manejarArchivo(e) {
   }
 }
 
-// ── Extraer la fecha de corte (fin del período) del encabezado ─
+// ── Extraer el período (desde / hasta) del encabezado ─────────
+// Devuelve { desde, hasta } (Date o null). "hasta" fija la fecha de corte;
+// "desde" se usa para detectar solapamiento con ventas ya importadas.
 function extraerFechaCorte(filas, XLSX) {
   for (const fila of filas) {
     if (!fila) continue;
     // Buscar la celda que contenga "periodo"
     const idx = fila.findIndex(c => typeof c === "string" && c.toLowerCase().includes("periodo"));
     if (idx === -1) continue;
-    // Las dos celdas siguientes son desde y hasta. Tomamos la última no vacía.
+    // Las celdas siguientes son desde y hasta. Tomamos la primera y la última no vacías.
     const candidatas = fila.slice(idx + 1).filter(c => c !== null && c !== undefined && String(c).trim() !== "");
     if (!candidatas.length) continue;
-    const valHasta = candidatas[candidatas.length - 1];
-    return parsearFechaCelda(valHasta, XLSX);
+    const hasta = parsearFechaCelda(candidatas[candidatas.length - 1], XLSX);
+    const desde = candidatas.length > 1 ? parsearFechaCelda(candidatas[0], XLSX) : null;
+    return { desde, hasta };
   }
-  return null;
+  return { desde: null, hasta: null };
 }
 
 function parsearFechaCelda(val, XLSX) {
@@ -305,8 +311,10 @@ function construirPreview(items) {
   const avisoFecha = document.getElementById("import-fecha-corte");
   if (avisoFecha) {
     if (_fechaCorte) {
-      const fStr = _fechaCorte.toLocaleDateString("es-AR", { day:"2-digit", month:"2-digit", year:"numeric" });
-      avisoFecha.innerHTML = `<div style="background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:9px 12px;font-size:0.82rem;color:var(--texto-2);margin-bottom:12px;">${icono("corte",{size:13})} Período del reporte detectado — las ventas quedarán cargadas <b>hasta el ${fStr}</b></div>`;
+      const opt = { day:"2-digit", month:"2-digit", year:"numeric" };
+      const fStr = _fechaCorte.toLocaleDateString("es-AR", opt);
+      const rango = _fechaDesde ? `desde el ${_fechaDesde.toLocaleDateString("es-AR", opt)} ` : "";
+      avisoFecha.innerHTML = `<div style="background:var(--verde-claro);border:1px solid var(--verde-suave);border-radius:var(--radio-input);padding:9px 12px;font-size:0.82rem;color:var(--texto-2);margin-bottom:12px;">${icono("corte",{size:13})} Período del reporte detectado — las ventas quedarán cargadas ${rango}<b>hasta el ${fStr}</b></div>`;
     } else {
       avisoFecha.innerHTML = `<div style="background:var(--bajo-bg);border:1px solid #F0D9B5;border-radius:var(--radio-input);padding:9px 12px;font-size:0.82rem;color:var(--bajo-txt);margin-bottom:12px;">${icono("alerta",{size:13})} No se detectó la fecha del período en el archivo. La fecha de corte no se actualizará.</div>`;
     }
@@ -329,6 +337,36 @@ async function confirmarImportacion() {
     msgEl.className = "msg show msg-error";
     msgEl.textContent = "No hay productos con sector para descontar.";
     return;
+  }
+
+  // ── Guarda anti-doble-importación ────────────────────────────
+  // El stock se descuenta con increment: si se importa el MISMO archivo dos
+  // veces (o un período que solapa con lo ya cargado), el stock se resta de
+  // más y queda por debajo de lo real. Cada producto guarda su "ventas_hasta"
+  // (hasta qué fecha ya se cargaron sus ventas). Marcamos solapamiento cuando:
+  //   • hay "desde" y el período nuevo arranca en/antes de lo ya cargado, o
+  //   • no hay "desde" y el corte no es posterior a lo ya cargado.
+  // Un producto sin ventas cargadas nunca solapa. Si hay solapamiento, se
+  // exige confirmación explícita antes de volver a descontar.
+  const solapados = aDescontar.filter(f => {
+    const vh = ventasHastaDe(f.prod);
+    if (!vh) return false;
+    if (_fechaDesde) return _fechaDesde <= vh;
+    return _fechaCorte ? _fechaCorte <= vh : false;
+  });
+  if (solapados.length) {
+    const fLbl = _fechaCorte ? _fechaCorte.toLocaleDateString("es-AR") : "este período";
+    const ok = confirm(
+      `⚠️ ${solapados.length} producto(s) de este archivo YA tienen ventas cargadas ` +
+      `hasta ${fLbl} o una fecha posterior.\n\n` +
+      `Si continuás, sus ventas se descontarán OTRA VEZ y el stock quedará por ` +
+      `debajo de lo real.\n\n¿Seguro que querés volver a descontar?`
+    );
+    if (!ok) {
+      msgEl.className = "msg show msg-error";
+      msgEl.textContent = "Importación cancelada: esas ventas ya estaban cargadas.";
+      return;
+    }
   }
 
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';

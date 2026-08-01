@@ -429,10 +429,13 @@ document.getElementById("btn-confirmar-ajuste").addEventListener("click",async()
   if(!ubic){mostrarMsg(msgEl,"error","Elegí la ubicación a ajustar.");return;}
   if(!motivo){mostrarMsg(msgEl,"error","El motivo es obligatorio.");return;}
   let stockAnterior,update,lugar;
-  if(ubic==="acopio"){stockAnterior=prod.stock_deposito??0;update={stock_deposito:nuevoStock};lugar="acopio";}
-  // Escribe SOLO el sector ajustado (field path), sin reescribir el mapa entero
-  // → no pisa el stock de otros sectores si el cache está atrasado.
-  else{const sector=ubic.slice(5);stockAnterior=prod.stock_despacho?.[sector]??0;update={[`stock_despacho.${sector}`]:nuevoStock};lugar=sector;}
+  if(ubic==="acopio"){stockAnterior=prod.stock_deposito??0;lugar="acopio";}
+  else{const sector=ubic.slice(5);stockAnterior=prod.stock_despacho?.[sector]??0;lugar=sector;}
+  // Se aplica la DIFERENCIA con increment (no el valor absoluto): así el ajuste
+  // compone con ventas/reposiciones/importaciones concurrentes en vez de pisarlas
+  // (mismo criterio que entradas/salidas/importación, que ya usan increment).
+  const delta=nuevoStock-stockAnterior;
+  update=(ubic==="acopio")?{stock_deposito:increment(delta)}:{[`stock_despacho.${lugar}`]:increment(delta)};
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
     await updateDoc(doc(db,"productos",prodId),update);
