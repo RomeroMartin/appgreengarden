@@ -1,11 +1,11 @@
 # Tests — Green Garden Inventario
 
-Dos capas de tests. Todo corre con **`npm test`** (sin navegador, sin Firebase real).
+Dos capas de tests (62 en total). Todo corre con **`npm test`** (sin navegador, sin Firebase real).
 
 ```bash
-npm test          # unit + e2e
+npm test          # unit + e2e (9 + 53)
 npm run test:unit # lógica pura (corte de ventas)
-npm run test:e2e  # simulador de las 5 vistas
+npm run test:e2e  # simulador de las 5 vistas (serie, determinista)
 ```
 
 ## 1. Unit (`test/corte-ventas.test.js`)
@@ -18,13 +18,18 @@ los clicks/inputs reales de la UI y verifica cómo queda el stock en la "base".
 
 Cubre las 5 vistas y toda la lógica que toca stock:
 
-| Vista | Qué verifica |
-|-------|--------------|
-| Entradas | ingreso a acopio (increment), validaciones |
-| Salidas | retiro de acopio/despacho, transferencia (reposición), stock insuficiente |
-| Encargado | entrada, retiro, transferencia, stock insuficiente |
-| Gerente | ajuste rápido (increment del delta), **conteo físico con venta concurrente** (no se pierde), importación de ventas, **guarda anti-doble-importación**, alta de producto |
-| Administrador | venta directa, ajuste, conteo concurrente, importación con guarda |
+| Archivo | Qué verifica |
+|---------|--------------|
+| `entradas` | ingreso a acopio (increment), validaciones |
+| `salidas` | retiro de acopio/despacho, transferencia, selector de origen, stock insuficiente |
+| `encargado` | entrada, retiro, transferencia, stock insuficiente |
+| `gerente` | ajuste rápido (delta), **conteo con venta concurrente**, importación, **guarda anti-doble**, alta de producto |
+| `administrador` | venta directa, ajuste, conteo concurrente, importación con guarda |
+| `importador` | PLU inexistente, multi-sector, dedup, recetas por variantes (match/no-config), sin período |
+| `productos` | alta despacho/receta, validaciones, editar sin pisar `stock_despacho`, cambio de tipo |
+| `movimientos` | editar/eliminar retiros (reverse + apply atómico) |
+| `ajuste-conteo` | validaciones de ajuste, conteo multi-balde, conteo sin cambios |
+| `config` | rubros, sectores, sectores de despacho, motivos, alta de usuario, borrado |
 
 ### Cómo funciona el andamiaje (`test/harness/`)
 - `store.mjs` — Firestore falso en memoria: `increment()`, field-paths con punto,
