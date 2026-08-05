@@ -77,12 +77,25 @@ document.getElementById("filtro-sector").addEventListener("change",renderInventa
 document.getElementById("filtro-rubro").addEventListener("change",renderInventario);
 document.getElementById("filtro-busqueda").addEventListener("input",renderInventario);
 
+let alertasAbierto=false;
 function renderAlertas() {
   const alertas=productos.filter(p=>{const min=p.stock_minimo;return min!=null&&min!==""&&stockTotal(p)<=min;});
   const sec=document.getElementById("seccion-alertas"),lst=document.getElementById("lista-alertas");
   if(!alertas.length){sec.style.display="none";return;}
   sec.style.display="block";
+  document.getElementById("alertas-count").textContent=`(${alertas.length})`;
   lst.innerHTML=alertas.map(p=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(217,83,79,0.15);"><span style="font-size:0.88rem;font-weight:600;">${escHtml(p.nombre)}</span><span style="font-weight:700;color:var(--critico-txt);">${fmtN(stockTotal(p))} / ${p.stock_minimo} ${escHtml(p.unidad_medida||"")}</span></div>`).join("");
+  lst.style.display=alertasAbierto?"block":"none";
+  document.getElementById("alertas-chevron").style.transform=alertasAbierto?"rotate(180deg)":"";
+  const header=document.getElementById("alertas-header");
+  if(header&&!header.dataset.wired){
+    header.dataset.wired="1";
+    header.addEventListener("click",()=>{
+      alertasAbierto=!alertasAbierto;
+      lst.style.display=alertasAbierto?"block":"none";
+      document.getElementById("alertas-chevron").style.transform=alertasAbierto?"rotate(180deg)":"";
+    });
+  }
 }
 
 function renderInventario() {

@@ -367,8 +367,10 @@ document.getElementById("btn-confirmar-venta").addEventListener("click",async()=
   if(!prod||cantidad<=0||!sector){mostrarMsg(msgEl,"error","Completá los campos.");return;}
   if(!hastaVal){mostrarMsg(msgEl,"error","Indicá hasta qué fecha y hora corresponde la venta.");return;}
   const fechaHasta=new Date(hastaVal);
-  const stockSector=prod.stock_despacho?.[sector]??0;
-  if(cantidad>stockSector){mostrarMsg(msgEl,"error",`Stock insuficiente en ${sector}. Hay ${stockSector} ${prod.unidad_medida}.`);return;}
+  // Criterio unificado con el importador: la venta SIEMPRE se registra, aunque
+  // supere el stock del sector. Firestore aplica increment(-cantidad) y el stock
+  // puede quedar negativo → sirve de señal de faltante (antes se bloqueaba con un
+  // Math.max/return, ocultando la discrepancia).
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
     await updateDoc(doc(db,"productos",prodId),{[`stock_despacho.${sector}`]:increment(-cantidad)});

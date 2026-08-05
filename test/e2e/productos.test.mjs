@@ -67,3 +67,12 @@ test("editar y cambiar el tipo a Materia prima vacía el mapa de despacho", asyn
   assert.equal(p.tipo, "Materia prima");
   assert.deepEqual(p.stock_despacho, {}, "al dejar de ser despacho, se limpia el mapa");
 });
+
+test("el buscador del catálogo filtra la lista de productos por nombre", () => {
+  setValue("prod-buscar", "lim");                 // Limón + Limonada
+  const t = text("lista-productos");
+  assert.match(t, /Lim[oó]n/);
+  assert.doesNotMatch(t, /Fernet/);               // Fernet no matchea "lim"
+  setValue("prod-buscar", "");                     // limpiar → vuelven todos
+  assert.match(text("lista-productos"), /Fernet/);
+});

@@ -229,6 +229,7 @@ function escucharProductos() {
 document.getElementById("filtro-sector").addEventListener("change", renderStock);
 document.getElementById("filtro-rubro").addEventListener("change", renderStock);
 document.getElementById("filtro-busqueda").addEventListener("input", renderStock);
+document.getElementById("prod-buscar").addEventListener("input", renderProductos);
 
 let alertasAbierto = false;
 function renderAlertas() {
@@ -300,7 +301,13 @@ function renderStock() {
 function renderProductos() {
   const cont = document.getElementById("lista-productos");
   if (!productos.length) { cont.innerHTML = '<div class="empty-state"><p>Sin productos.</p></div>'; return; }
-  cont.innerHTML = productos.map(p => {
+  // Buscador del catálogo: filtra por nombre o PLU para encontrar rápido qué editar.
+  const q = (document.getElementById("prod-buscar")?.value || "").trim().toLowerCase();
+  const lista = q
+    ? productos.filter(p => (p.nombre || "").toLowerCase().includes(q) || String(p.plu ?? "").toLowerCase().includes(q))
+    : productos;
+  if (!lista.length) { cont.innerHTML = '<div class="empty-state"><p>Sin resultados para "' + escHtml(q) + '".</p></div>'; return; }
+  cont.innerHTML = lista.map(p => {
     const tipoIcon = esReceta(p) ? icono("receta",{size:15}) : esDespacho(p) ? icono("despacho",{size:15}) : icono("materia",{size:15});
     let detalle;
     if (esReceta(p)) {
@@ -619,8 +626,47 @@ window.abrirEditarProducto = (id) => {
   abrirModal("modal-producto");
 };
 
+// Cuando cambia el rendimiento (o la subunidad / unidad base) de una materia prima,
+// las recetas que la usan "en subunidad" tienen su cantidad BASE —lo que descuenta
+// del stock el importador— calculada con el rendimiento VIEJO. Acá las recalculamos:
+// cantidad = cant_in / rendimiento_nuevo, y refrescamos las etiquetas de display.
+// Antes había que reabrir y volver a guardar cada receta a mano.
+async function recalcularRecetasPorRendimiento(prodId, nuevoRend, nuevaSub, nuevaUnidadBase, nuevoNombre) {
+  if (!(nuevoRend > 0)) return; // sin rendimiento válido no hay conversión de subunidad
+  const fix = (ings) => {
+    let cambio = false;
+    const out = (ings || []).map(ing => {
+      // Sólo ingredientes de ESTE producto ingresados en subunidad (unidad_in ≠ unidad base).
+      if (ing.id !== prodId || ing.cant_in == null || !ing.unidad_in || ing.unidad_in === ing.unidad) return ing;
+      const nueva = { ...ing, cantidad: +(+ing.cant_in / nuevoRend).toFixed(6) };
+      if (nuevoNombre) nueva.nombre = nuevoNombre;
+      if (nuevaUnidadBase) nueva.unidad = nuevaUnidadBase;
+      if (nuevaSub) nueva.unidad_in = nuevaSub;
+      cambio = cambio || (nueva.cantidad !== ing.cantidad || nueva.nombre !== ing.nombre ||
+                          nueva.unidad !== ing.unidad || nueva.unidad_in !== ing.unidad_in);
+      return nueva;
+    });
+    return cambio ? out : null;
+  };
+  for (const r of productos.filter(esReceta)) {
+    if (r.por_variantes) {
+      let algun = false;
+      const variantes = (r.variantes || []).map(v => {
+        const nuevos = fix(v.ingredientes);
+        if (nuevos) { algun = true; return { ...v, ingredientes: nuevos }; }
+        return v;
+      });
+      if (algun) await updateDoc(doc(db, "productos", r.id), { variantes });
+    } else {
+      const nuevos = fix(r.ingredientes);
+      if (nuevos) await updateDoc(doc(db, "productos", r.id), { ingredientes: nuevos });
+    }
+  }
+}
+
 document.getElementById("btn-guardar-producto").addEventListener("click", async () => {
   const id      = document.getElementById("prod-id").value;
+  const prev    = id ? productos.find(x => x.id === id) : null;
   const nombre  = document.getElementById("prod-nombre").value.trim();
   const plu     = document.getElementById("prod-plu").value.trim();
   const rubro   = document.getElementById("prod-rubro").value;
@@ -697,6 +743,16 @@ document.getElementById("btn-guardar-producto").addEventListener("click", async 
       // Si el producto deja de ser de Despacho, su mapa de despacho ya no aplica.
       if (tipo !== "Despacho") update.stock_despacho = {};
       await updateDoc(doc(db, "productos", id), update);
+      // Si cambió el rendimiento/subunidad/unidad base, recalcular las recetas que lo usan.
+      if (tipo !== "Receta" && prev) {
+        const cambioFraccion =
+          (prev.rendimiento ?? null) !== (fraccionData.rendimiento ?? null) ||
+          (prev.subunidad ?? null)   !== (fraccionData.subunidad ?? null)   ||
+          (prev.unidad_medida ?? null) !== unidad;
+        if (cambioFraccion) {
+          await recalcularRecetasPorRendimiento(id, fraccionData.rendimiento, fraccionData.subunidad, unidad, nombre);
+        }
+      }
     } else {
       const despachoInit = {};
       if (tipo === "Despacho") seleccionados.forEach(s => { despachoInit[s] = 0; });
