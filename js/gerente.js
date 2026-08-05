@@ -17,7 +17,7 @@ import {
 import { icono } from "./iconos.js";
 import {
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc,
-  getDocs, onSnapshot, query, orderBy, limit, serverTimestamp, writeBatch, increment
+  getDocs, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signOut as signOutSec } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -1126,7 +1126,12 @@ function filaMovimiento(m) {
   const label = LABELS_MOV[m.tipo]  || escHtml(m.tipo);
   const destinoExtra = (m.tipo === "RETIRO" && m.destino && m.destino !== "produccion" && m.destino !== "consumo") ? ` → ${escHtml(m.destino)}` : "";
   const corregido = m.corregido ? ` <span style="font-size:0.62rem;background:var(--bg-secondary);color:var(--texto-3);padding:1px 6px;border-radius:5px;display:inline-flex;align-items:center;gap:3px;">${icono("editar",{size:10})} corregido</span>` : "";
-  const btnEditar = (m.tipo === "RETIRO" && m.id) ? `<button class="btn-icono" onclick="abrirEditarMotivo('${m.id}')" title="Editar retiro" style="padding:2px 7px;">${icono("editar",{size:16})}</button>` : "";
+  const esEntrada = m.tipo === "INGRESO_PROVEEDOR" || m.tipo === "INGRESO_PRODUCCION";
+  const btnEditar = (m.tipo === "RETIRO" && m.id)
+    ? `<button class="btn-icono" onclick="abrirEditarMotivo('${m.id}')" title="Editar retiro" style="padding:2px 7px;">${icono("editar",{size:16})}</button>`
+    : (esEntrada && m.id)
+    ? `<button class="btn-icono" onclick="abrirEditarEntrada('${m.id}')" title="Editar entrada" style="padding:2px 7px;">${icono("editar",{size:16})}</button>`
+    : "";
   return `<div class="mov-row">
     <div class="mov-header">
       <span class="mov-producto">${escHtml(m.nombre_producto||"—")}</span>
@@ -1430,6 +1435,159 @@ document.getElementById("btn-confirmar-eliminar").addEventListener("click", asyn
   finally { btn.disabled = false; btn.innerHTML = "Sí, eliminar"; }
 });
 
+// ── EDITAR / ELIMINAR ENTRADA (INGRESO) — solo Gerente ────────
+// Una entrada suma `cantidad` al acopio del producto. Editar = revertir el efecto
+// original (acopio del producto viejo −= cantidad vieja) y aplicar el nuevo (acopio
+// del producto nuevo += cantidad nueva), atómico con increment. Eliminar = solo
+// revertir y borrar. Espeja "editar retiro" pero sin motivo ni sectores: una
+// entrada siempre va a acopio. Antes, para corregir una entrada mal cargada había
+// que hacer un ajuste de stock aparte.
+let edeMov = null;
+const edeProdSel = () => productos.find(p => p.id === document.getElementById("ede-producto").value);
+const edeCant    = () => parseFloat(document.getElementById("ede-cantidad").value);
+
+function edePoblarProductos(filtro) {
+  const sel = document.getElementById("ede-producto");
+  const actual = sel.value;
+  const t = (filtro || "").toLowerCase();
+  const lista = productos.slice().sort((a,b) => (a.nombre||"").localeCompare(b.nombre||""));
+  const f = t ? lista.filter(p => (p.nombre||"").toLowerCase().includes(t)) : lista;
+  sel.innerHTML = f.map(p => `<option value="${p.id}">${escHtml(p.nombre)}</option>`).join("");
+  if (actual && f.some(p => p.id === actual)) sel.value = actual;
+}
+
+// Deltas de acopio por producto: revierte la entrada original y (si aplica) suma la editada.
+function edeDeltas(incluirApply) {
+  const m = edeMov;
+  const deltas = {};
+  const add = (pid, delta) => { deltas[pid] = (deltas[pid] || 0) + delta; };
+  add(m.id_producto, -m.cantidad);                                              // revertir original
+  if (incluirApply) { const prod = edeProdSel(); if (prod) add(prod.id, edeCant() || 0); }  // aplicar editado
+  return deltas;
+}
+
+function edeFmtDeltas(deltas) {
+  return Object.keys(deltas).filter(pid => deltas[pid]).map(pid => {
+    const p = productos.find(x => x.id === pid);
+    const u = (p && p.unidad_medida) || "";
+    const d = deltas[pid];
+    return `${escHtml(p ? p.nombre : "producto")}: acopio ${d>0?"+":""}${+d.toFixed(3)} ${u}`;
+  });
+}
+
+function edeActualizar() {
+  if (!edeMov) return;
+  const lineas = edeFmtDeltas(edeDeltas(true));
+  document.getElementById("ede-preview").innerHTML = lineas.length
+    ? `Ajuste de stock: <strong>${lineas.join(" · ")}</strong>.`
+    : "Sin cambios.";
+}
+
+window.abrirEditarEntrada = (id) => {
+  const m = movIndex[id];
+  if (!m || (m.tipo !== "INGRESO_PROVEEDOR" && m.tipo !== "INGRESO_PRODUCCION")) return;
+  edeMov = m;
+  const tipoTxt = m.tipo === "INGRESO_PROVEEDOR" ? "Proveedor" : "Producción";
+  document.getElementById("ede-info").innerHTML =
+    `<div><strong>${escHtml(m.nombre_producto)}</strong> · original: ${escHtml(m.cantidad)} ${escHtml(m.unidad||"")}</div>
+     <div style="color:var(--texto-3);font-size:0.78rem;margin-top:2px;">Entrada (${escHtml(tipoTxt)}) → suma al acopio</div>`;
+  document.getElementById("ede-buscar").value = "";
+  edePoblarProductos("");
+  document.getElementById("ede-producto").value = m.id_producto;
+  document.getElementById("ede-cantidad").value = m.cantidad;
+  document.getElementById("ede-confirm-eliminar").style.display = "none";
+  document.getElementById("msg-editar-entrada").classList.remove("show");
+  edeActualizar();
+  abrirModal("modal-editar-entrada");
+};
+
+document.getElementById("ede-buscar").addEventListener("input", (e) => { edePoblarProductos(e.target.value); edeActualizar(); });
+document.getElementById("ede-producto").addEventListener("change", edeActualizar);
+document.getElementById("ede-cantidad").addEventListener("input", edeActualizar);
+
+function edeAplicarLocal(deltas) {
+  Object.keys(deltas).forEach(pid => {
+    const p = productos.find(x => x.id === pid); if (!p) return;
+    if (deltas[pid]) p.stock_deposito = +(((p.stock_deposito ?? 0) + deltas[pid])).toFixed(4);
+  });
+}
+
+document.getElementById("btn-confirmar-editar-entrada").addEventListener("click", async () => {
+  const m = edeMov;
+  const msgEl = document.getElementById("msg-editar-entrada");
+  const btn = document.getElementById("btn-confirmar-editar-entrada");
+  if (!m) return;
+  const newProd = edeProdSel();
+  if (!newProd) { mostrarMsg(msgEl,"error","Elegí un producto válido."); return; }
+  const newCant = edeCant();
+  if (!(newCant > 0)) { mostrarMsg(msgEl,"error","La cantidad debe ser mayor a 0."); return; }
+  if (newProd.id === m.id_producto && newCant === m.cantidad) { mostrarMsg(msgEl,"error","No hiciste ningún cambio."); return; }
+
+  const deltas = edeDeltas(true);
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    const batch = writeBatch(db);
+    Object.keys(deltas).forEach(pid => {
+      if (!productos.some(p => p.id === pid)) return;
+      if (deltas[pid]) batch.update(doc(db,"productos",pid), { stock_deposito: increment(deltas[pid]) });
+    });
+    batch.update(doc(db,"movimientos",m.id), {
+      id_producto: newProd.id,
+      nombre_producto: newProd.nombre,
+      cantidad: newCant,
+      unidad: newProd.unidad_medida || m.unidad || "",
+      corregido: true,
+      cantidad_anterior: m.cantidad,
+      fecha_correccion: serverTimestamp()
+    });
+    await batch.commit();
+    edeAplicarLocal(deltas);
+    m.id_producto = newProd.id; m.nombre_producto = newProd.nombre; m.cantidad = newCant;
+    m.unidad = newProd.unidad_medida || m.unidad || ""; m.corregido = true;
+    cerrarModal("modal-editar-entrada");
+    cargarMovRecientes();
+    renderStock();
+    if (movimientosCached.length) renderHistorial();
+  } catch(err) { mostrarMsg(msgEl,"error","Error: " + err.message); }
+  finally { btn.disabled = false; btn.innerHTML = "Aplicar cambios"; }
+});
+
+document.getElementById("btn-eliminar-entrada").addEventListener("click", () => {
+  if (!edeMov) return;
+  const lineas = edeFmtDeltas(edeDeltas(false));
+  document.getElementById("ede-eliminar-preview").innerHTML =
+    `Se eliminará esta entrada y se revertirá el stock. ${lineas.length ? `Ajuste: <strong>${lineas.join(" · ")}</strong>.` : ""}`;
+  document.getElementById("ede-confirm-eliminar").style.display = "";
+});
+document.getElementById("btn-cancelar-eliminar-entrada").addEventListener("click", () => {
+  document.getElementById("ede-confirm-eliminar").style.display = "none";
+});
+document.getElementById("btn-confirmar-eliminar-entrada").addEventListener("click", async () => {
+  const m = edeMov;
+  const msgEl = document.getElementById("msg-editar-entrada");
+  const btn = document.getElementById("btn-confirmar-eliminar-entrada");
+  if (!m) return;
+  const deltas = edeDeltas(false);
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    const batch = writeBatch(db);
+    Object.keys(deltas).forEach(pid => {
+      if (!productos.some(p => p.id === pid)) return;
+      if (deltas[pid]) batch.update(doc(db,"productos",pid), { stock_deposito: increment(deltas[pid]) });
+    });
+    batch.delete(doc(db,"movimientos",m.id));
+    await batch.commit();
+    edeAplicarLocal(deltas);
+    delete movIndex[m.id];
+    movimientosCached = movimientosCached.filter(x => x.id !== m.id);
+    cerrarModal("modal-editar-entrada");
+    cargarMovRecientes();
+    renderStock();
+    if (movimientosCached.length) renderHistorial();
+  } catch(err) { mostrarMsg(msgEl,"error","Error: " + err.message); }
+  finally { btn.disabled = false; btn.innerHTML = "Sí, eliminar"; }
+});
+
 // ── USUARIOS ──────────────────────────────────────────────────
 function escucharUsuarios() {
   onSnapshot(collection(db,"usuarios"), snap => {
@@ -1538,29 +1696,47 @@ async function cargarHistorial() {
 
 function poblarFiltrosHist() {
   const usrs  = [...new Set(movimientosCached.map(m=>m.nombre_usuario).filter(Boolean))].sort();
-  const prods = [...new Set(movimientosCached.map(m=>m.nombre_producto).filter(Boolean))].sort();
-  document.getElementById("filtro-hist-usuario").innerHTML  = '<option value="">Todos los usuarios</option>'  + usrs.map(u=>`<option value="${u}">${u}</option>`).join("");
-  document.getElementById("filtro-hist-producto").innerHTML = '<option value="">Todos los productos</option>' + prods.map(p=>`<option value="${p}">${p}</option>`).join("");
+  // Productos: TODO el catálogo (no solo los de los 200 recientes), así uno con
+  // movimientos viejos también se puede elegir y filtrar por rango de fechas. Se
+  // suman los nombres que aparezcan en el cache por si un producto fue borrado.
+  const prods = [...new Set([...productos.map(p=>p.nombre), ...movimientosCached.map(m=>m.nombre_producto)].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  document.getElementById("filtro-hist-usuario").innerHTML  = '<option value="">Todos los usuarios</option>'  + usrs.map(u=>`<option value="${u}">${escHtml(u)}</option>`).join("");
+  document.getElementById("filtro-hist-producto").innerHTML = '<option value="">Todos los productos</option>' + prods.map(p=>`<option value="${escHtml(p)}">${escHtml(p)}</option>`).join("");
 }
 
-function aplicarFiltros() {
+// Trae los movimientos a filtrar. Con rango de fechas consulta Firestore por ESE
+// rango (sin el tope de 200 → no se pierde nada viejo); sin rango usa el cache de
+// los 200 más recientes (rápido para el uso normal). Antes SIEMPRE filtraba sobre
+// el cache de 200, así que un rango viejo mostraba de menos.
+async function obtenerMovimientos(desde, hasta) {
+  if (!desde && !hasta) return movimientosCached;
+  const cond = [];
+  if (desde) cond.push(where("fecha_hora", ">=", new Date(desde + "T00:00:00")));
+  if (hasta) cond.push(where("fecha_hora", "<=", new Date(hasta + "T23:59:59")));
+  const snap = await getDocs(query(collection(db, "movimientos"), ...cond, orderBy("fecha_hora", "desc")));
+  const movs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  movs.forEach(m => { movIndex[m.id] = m; });   // que se puedan editar/eliminar los traídos
+  return movs;
+}
+
+async function aplicarFiltros() {
   const tipo  = document.getElementById("filtro-hist-tipo").value;
   const usr   = document.getElementById("filtro-hist-usuario").value;
   const prod  = document.getElementById("filtro-hist-producto").value;
   const desde = document.getElementById("filtro-hist-desde").value;
   const hasta = document.getElementById("filtro-hist-hasta").value;
-  let lista   = [...movimientosCached];
+  let lista   = [...(await obtenerMovimientos(desde, hasta))];
   if (tipo)  lista = lista.filter(m => m.tipo === tipo);
   if (usr)   lista = lista.filter(m => m.nombre_usuario === usr);
   if (prod)  lista = lista.filter(m => m.nombre_producto === prod);
-  if (desde) lista = lista.filter(m => { const ts = m.fecha_hora?.toDate?.(); return ts && ts >= new Date(desde + "T00:00:00"); });
-  if (hasta) lista = lista.filter(m => { const ts = m.fecha_hora?.toDate?.(); return ts && ts <= new Date(hasta + "T23:59:59"); });
+  // El rango de fechas ya lo aplicó Firestore en obtenerMovimientos.
   return lista;
 }
 
-function renderHistorial() {
+async function renderHistorial() {
   const cont  = document.getElementById("lista-historial");
-  const lista = aplicarFiltros();
+  cont.innerHTML = '<div class="empty-state"><div class="spinner spinner-verde"></div></div>';
+  const lista = await aplicarFiltros();
   if (!lista.length) { cont.innerHTML = '<div class="empty-state"><p>Sin resultados.</p></div>'; return; }
   cont.innerHTML = lista.map(filaMovimiento).join("");
 }
@@ -1572,7 +1748,7 @@ document.getElementById("btn-limpiar-filtros").addEventListener("click", () => {
 });
 
 document.getElementById("btn-exportar-excel").addEventListener("click", async () => {
-  const lista = aplicarFiltros();
+  const lista = await aplicarFiltros();
   if (!lista.length) { alert("No hay datos para exportar."); return; }
   const btn = document.getElementById("btn-exportar-excel");
   btn.disabled = true; btn.textContent = "Generando...";

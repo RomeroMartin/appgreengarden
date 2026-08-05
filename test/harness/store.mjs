@@ -9,6 +9,9 @@ export class Ts {
   constructor(ms) { this.ms = ms; }
   toDate() { return new Date(this.ms); }
   get seconds() { return Math.floor(this.ms / 1000); }
+  // Comparable numéricamente con Date/otro Ts en where(>=,<=) y orderBy (Firestore
+  // ordena timestamps). Sin esto, where("fecha_hora", ">=", Date) daba siempre false.
+  valueOf() { return this.ms; }
 }
 export class Increment { constructor(n) { this.n = n; } }
 export const DELETE = Symbol("deleteField");

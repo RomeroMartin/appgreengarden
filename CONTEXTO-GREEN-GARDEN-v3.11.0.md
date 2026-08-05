@@ -1,4 +1,4 @@
-# CONTEXTO COMPLETO — Green Garden Inventario (v3.10.0)
+# CONTEXTO COMPLETO — Green Garden Inventario (v3.11.0)
 
 > Pegá este documento al iniciar una conversación nueva. Resume TODO el proyecto: qué es, cómo está hecho técnicamente, la lógica de negocio, la UX/UI, el estado actual y lo que queda pendiente. Está escrito para que una instancia nueva de Claude entienda el proyecto sin necesidad de la conversación anterior.
 
@@ -284,7 +284,11 @@ Lleva, por cada producto de despacho, hasta qué fecha están cargadas sus venta
 
 ---
 
-## 14. ESTADO ACTUAL (v3.10.0) — qué se hizo recientemente
+## 14. ESTADO ACTUAL (v3.11.0) — qué se hizo recientemente
+
+**v3.11.0 (features):**
+- **Editar/eliminar entradas (INGRESO)** — solo Gerente. Modal `modal-editar-entrada` con reverse+apply sobre el acopio (atómico, `increment`). Antes, para corregir una entrada mal cargada había que hacer un ajuste de stock aparte.
+- **Filtro de historial por rango de fechas trae TODO** — con rango, consulta Firestore por ese rango (sin el tope de 200 más recientes). Antes filtraba sobre el cache de 200, así que un rango viejo mostraba de menos. El desplegable de productos del filtro ahora lista todo el catálogo.
 
 **v3.10.0 (features):**
 - **Venta manual permite negativo:** ya no bloquea por stock insuficiente; registra la venta y deja el sector en negativo como señal de faltante (unificado con el importador). Los retiros conservan su guard.
@@ -335,12 +339,12 @@ Lleva, por cada producto de despacho, hasta qué fecha están cargadas sus venta
 
 ---
 
-## 16. TESTS Y SIMULADOR DE VISTAS (v3.10.0)
+## 16. TESTS Y SIMULADOR DE VISTAS (v3.11.0)
 
 Hay una suite de tests que corre **sin navegador ni Firebase real** con `npm test` (unit + e2e). Sirve como red de seguridad para cambios futuros.
 
 ```bash
-npm test          # 67 tests (9 unit + 58 e2e)
+npm test          # 71 tests (9 unit + 62 e2e)
 npm run test:unit # lógica de fechas del corte de ventas
 npm run test:e2e  # simulador de las 5 vistas
 ```
@@ -363,4 +367,4 @@ Cubre las 5 vistas y toda la lógica de stock: entradas, retiros/transferencias,
 
 ---
 
-*Fin del contexto. La app está en v3.10.0, operativa y deployada. Para continuar: trabajar sobre el repo, correr `npm test` ante cualquier cambio de stock, y seguir las convenciones de la sección 13.*
+*Fin del contexto. La app está en v3.11.0, operativa y deployada. Para continuar: trabajar sobre el repo, correr `npm test` ante cualquier cambio de stock, y seguir las convenciones de la sección 13.*
