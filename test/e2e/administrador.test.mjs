@@ -29,16 +29,18 @@ test("venta directa descuenta del sector de despacho (increment) y avanza ventas
   assert.equal(store.dump("movimientos").at(-1).tipo, "VENTA");
 });
 
-test("rechaza venta por stock insuficiente en el sector", async () => {
+test("venta con stock insuficiente procede y deja el sector negativo (señal de faltante, como el importador)", async () => {
   await click("btn-mov-venta");
   setSelect("vta-producto", "p-cerveza");
   setSelect("vta-sector", "Salon");
-  setValue("vta-cantidad", "99999");
   const antes = store.get("productos", "p-cerveza").stock_despacho.Salon;
   const movs = store.count("movimientos");
+  setValue("vta-cantidad", String(antes + 5));
   await click("btn-confirmar-venta");
-  assert.equal(store.get("productos", "p-cerveza").stock_despacho.Salon, antes);
-  assert.equal(store.count("movimientos"), movs);
+  // Ya no se bloquea: se registra la venta y el sector queda en negativo.
+  assert.equal(store.get("productos", "p-cerveza").stock_despacho.Salon, antes - (antes + 5));
+  assert.equal(store.count("movimientos"), movs + 1);
+  assert.equal(store.dump("movimientos").at(-1).tipo, "VENTA");
 });
 
 test("ajuste rápido de acopio deja el balde en el valor ingresado (increment del delta)", async () => {

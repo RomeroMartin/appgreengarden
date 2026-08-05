@@ -185,7 +185,7 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click",async(
   if(!prod||cantidad<=0){mostrarMsg(msgEl,"error","Completá los campos.");return;}
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
-    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo,cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"externo",destino:"acopio"});
+    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo,cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"externo",destino:"acopio"});
     await updateDoc(doc(db,"productos",prodId),{stock_deposito:increment(cantidad)});
     mostrarMsg(msgEl,"ok",`✓ ${cantidad} ${prod.unidad_medida} ingresados al acopio.`);
     document.getElementById("ent-cantidad").value="1"; cargarMovRecientes();
@@ -293,7 +293,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click",async()
     btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
     try{
       await updateDoc(doc(db,"productos",prodId),{[`stock_despacho.${origen}`]:increment(-cantidad)});
-      await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen,destino:"consumo"});
+      await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen,destino:"consumo"});
       mostrarMsg(msgEl,"ok",`✓ Retiro de ${cantidad} ${prod.unidad_medida} desde ${origen}.`);
       document.getElementById("sal-cantidad").value="1"; cargarMovRecientes();
     }catch(err){mostrarMsg(msgEl,"error","Error: "+err.message);}
@@ -319,7 +319,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click",async()
     }else{
       await updateDoc(doc(db,"productos",prodId),{stock_deposito:increment(-cantidad)});
     }
-    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"acopio",destino});
+    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"acopio",destino});
     mostrarMsg(msgEl,"ok",destino!=="consumo"?`✓ Retiro de ${cantidad} ${prod.unidad_medida} → ${destino}.`:`✓ Retiro registrado (${motivo}).`);
     document.getElementById("sal-cantidad").value="1"; cargarMovRecientes();
   }catch(err){mostrarMsg(msgEl,"error","Error: "+err.message);}
@@ -367,12 +367,14 @@ document.getElementById("btn-confirmar-venta").addEventListener("click",async()=
   if(!prod||cantidad<=0||!sector){mostrarMsg(msgEl,"error","Completá los campos.");return;}
   if(!hastaVal){mostrarMsg(msgEl,"error","Indicá hasta qué fecha y hora corresponde la venta.");return;}
   const fechaHasta=new Date(hastaVal);
-  const stockSector=prod.stock_despacho?.[sector]??0;
-  if(cantidad>stockSector){mostrarMsg(msgEl,"error",`Stock insuficiente en ${sector}. Hay ${stockSector} ${prod.unidad_medida}.`);return;}
+  // Criterio unificado con el importador: la venta SIEMPRE se registra, aunque
+  // supere el stock del sector. Firestore aplica increment(-cantidad) y el stock
+  // puede quedar negativo → sirve de señal de faltante (antes se bloqueaba con un
+  // Math.max/return, ocultando la discrepancia).
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
     await updateDoc(doc(db,"productos",prodId),{[`stock_despacho.${sector}`]:increment(-cantidad)});
-    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"VENTA",cantidad,unidad:prod.unidad_medida,motivo:obs||"Venta",origen:sector,destino:"salon",periodo_desde:desdeVal?new Date(desdeVal):null,periodo_hasta:fechaHasta});
+    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"VENTA",cantidad,unidad:prod.unidad_medida,motivo:obs||"Venta",origen:sector,destino:"salon",periodo_desde:desdeVal?new Date(desdeVal):null,periodo_hasta:fechaHasta});
     if(debeAvanzar(prod.ventas_hasta,fechaHasta)){
       await updateDoc(doc(db,"productos",prodId),{ventas_hasta:fechaHasta});
     }
@@ -439,7 +441,7 @@ document.getElementById("btn-confirmar-ajuste").addEventListener("click",async()
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
     await updateDoc(doc(db,"productos",prodId),update);
-    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"AJUSTE",cantidad:Math.abs(nuevoStock-stockAnterior),unidad:prod.unidad_medida,motivo:`Ajuste ${lugar}: ${motivo} (${stockAnterior} → ${nuevoStock})`,origen:lugar,destino:lugar});
+    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"AJUSTE",cantidad:Math.abs(nuevoStock-stockAnterior),unidad:prod.unidad_medida,motivo:`Ajuste ${lugar}: ${motivo} (${stockAnterior} → ${nuevoStock})`,origen:lugar,destino:lugar});
     mostrarMsg(msgEl,"ok",`✓ ${lugar} ajustado de ${stockAnterior} a ${nuevoStock} ${prod.unidad_medida}.`);
     cargarMovRecientes();
   }catch(err){mostrarMsg(msgEl,"error","Error: "+err.message);}
@@ -533,11 +535,11 @@ function edmPoblarProductos(filtro){
   sel.innerHTML=f.map(p=>`<option value="${p.id}">${escHtml(p.nombre)}</option>`).join("");
   if(actual&&f.some(p=>p.id===actual))sel.value=actual;
 }
-function edmPoblarMotivos(){
+function edmPoblarMotivos(desdeMovimiento=false){
   const m=edmMov;if(!m)return;
   const prod=edmProdSel();
   const sel=document.getElementById("edm-motivo");
-  const prev=sel.value||(m.motivo||"").split(" — ")[0];
+  const prev=desdeMovimiento?(m.motivo||"").split(" — ")[0]:(sel.value||(m.motivo||"").split(" — ")[0]);
   const desdeDespacho=!!(m.origen&&m.origen!=="acopio");
   let opciones=motivosSalida;
   if((prod&&!esDespacho(prod))||desdeDespacho)opciones=motivosSalida.filter(x=>!x.transfiere);
@@ -554,7 +556,7 @@ window.abrirEditarMotivo=(id)=>{
   edmPoblarProductos("");
   document.getElementById("edm-producto").value=m.id_producto;
   document.getElementById("edm-cantidad").value=m.cantidad;
-  edmPoblarMotivos();
+  edmPoblarMotivos(true);
   document.getElementById("edm-confirm-eliminar").style.display="none";
   document.getElementById("msg-editar-motivo").classList.remove("show");
   edmActualizar();

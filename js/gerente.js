@@ -229,6 +229,7 @@ function escucharProductos() {
 document.getElementById("filtro-sector").addEventListener("change", renderStock);
 document.getElementById("filtro-rubro").addEventListener("change", renderStock);
 document.getElementById("filtro-busqueda").addEventListener("input", renderStock);
+document.getElementById("prod-buscar").addEventListener("input", renderProductos);
 
 let alertasAbierto = false;
 function renderAlertas() {
@@ -300,7 +301,13 @@ function renderStock() {
 function renderProductos() {
   const cont = document.getElementById("lista-productos");
   if (!productos.length) { cont.innerHTML = '<div class="empty-state"><p>Sin productos.</p></div>'; return; }
-  cont.innerHTML = productos.map(p => {
+  // Buscador del catálogo: filtra por nombre o PLU para encontrar rápido qué editar.
+  const q = (document.getElementById("prod-buscar")?.value || "").trim().toLowerCase();
+  const lista = q
+    ? productos.filter(p => (p.nombre || "").toLowerCase().includes(q) || String(p.plu ?? "").toLowerCase().includes(q))
+    : productos;
+  if (!lista.length) { cont.innerHTML = '<div class="empty-state"><p>Sin resultados para "' + escHtml(q) + '".</p></div>'; return; }
+  cont.innerHTML = lista.map(p => {
     const tipoIcon = esReceta(p) ? icono("receta",{size:15}) : esDespacho(p) ? icono("despacho",{size:15}) : icono("materia",{size:15});
     let detalle;
     if (esReceta(p)) {
@@ -619,8 +626,47 @@ window.abrirEditarProducto = (id) => {
   abrirModal("modal-producto");
 };
 
+// Cuando cambia el rendimiento (o la subunidad / unidad base) de una materia prima,
+// las recetas que la usan "en subunidad" tienen su cantidad BASE —lo que descuenta
+// del stock el importador— calculada con el rendimiento VIEJO. Acá las recalculamos:
+// cantidad = cant_in / rendimiento_nuevo, y refrescamos las etiquetas de display.
+// Antes había que reabrir y volver a guardar cada receta a mano.
+async function recalcularRecetasPorRendimiento(prodId, nuevoRend, nuevaSub, nuevaUnidadBase, nuevoNombre) {
+  if (!(nuevoRend > 0)) return; // sin rendimiento válido no hay conversión de subunidad
+  const fix = (ings) => {
+    let cambio = false;
+    const out = (ings || []).map(ing => {
+      // Sólo ingredientes de ESTE producto ingresados en subunidad (unidad_in ≠ unidad base).
+      if (ing.id !== prodId || ing.cant_in == null || !ing.unidad_in || ing.unidad_in === ing.unidad) return ing;
+      const nueva = { ...ing, cantidad: +(+ing.cant_in / nuevoRend).toFixed(6) };
+      if (nuevoNombre) nueva.nombre = nuevoNombre;
+      if (nuevaUnidadBase) nueva.unidad = nuevaUnidadBase;
+      if (nuevaSub) nueva.unidad_in = nuevaSub;
+      cambio = cambio || (nueva.cantidad !== ing.cantidad || nueva.nombre !== ing.nombre ||
+                          nueva.unidad !== ing.unidad || nueva.unidad_in !== ing.unidad_in);
+      return nueva;
+    });
+    return cambio ? out : null;
+  };
+  for (const r of productos.filter(esReceta)) {
+    if (r.por_variantes) {
+      let algun = false;
+      const variantes = (r.variantes || []).map(v => {
+        const nuevos = fix(v.ingredientes);
+        if (nuevos) { algun = true; return { ...v, ingredientes: nuevos }; }
+        return v;
+      });
+      if (algun) await updateDoc(doc(db, "productos", r.id), { variantes });
+    } else {
+      const nuevos = fix(r.ingredientes);
+      if (nuevos) await updateDoc(doc(db, "productos", r.id), { ingredientes: nuevos });
+    }
+  }
+}
+
 document.getElementById("btn-guardar-producto").addEventListener("click", async () => {
   const id      = document.getElementById("prod-id").value;
+  const prev    = id ? productos.find(x => x.id === id) : null;
   const nombre  = document.getElementById("prod-nombre").value.trim();
   const plu     = document.getElementById("prod-plu").value.trim();
   const rubro   = document.getElementById("prod-rubro").value;
@@ -697,6 +743,16 @@ document.getElementById("btn-guardar-producto").addEventListener("click", async 
       // Si el producto deja de ser de Despacho, su mapa de despacho ya no aplica.
       if (tipo !== "Despacho") update.stock_despacho = {};
       await updateDoc(doc(db, "productos", id), update);
+      // Si cambió el rendimiento/subunidad/unidad base, recalcular las recetas que lo usan.
+      if (tipo !== "Receta" && prev) {
+        const cambioFraccion =
+          (prev.rendimiento ?? null) !== (fraccionData.rendimiento ?? null) ||
+          (prev.subunidad ?? null)   !== (fraccionData.subunidad ?? null)   ||
+          (prev.unidad_medida ?? null) !== unidad;
+        if (cambioFraccion) {
+          await recalcularRecetasPorRendimiento(id, fraccionData.rendimiento, fraccionData.subunidad, unidad, nombre);
+        }
+      }
     } else {
       const despachoInit = {};
       if (tipo === "Despacho") seleccionados.forEach(s => { despachoInit[s] = 0; });
@@ -800,7 +856,7 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click", async
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
     await addDoc(collection(db,"movimientos"), {
-      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid,
+      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
       nombre_usuario: usuarioActual.nombre, id_producto: prodId,
       nombre_producto: prod.nombre, tipo, cantidad, unidad: prod.unidad_medida,
       motivo: obs ? `${motivo} — ${obs}` : motivo, origen: "externo", destino: "acopio"
@@ -931,7 +987,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click", async 
         [`stock_despacho.${origen}`]: increment(-cantidad)
       });
       await addDoc(collection(db,"movimientos"), {
-        fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid,
+        fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
         nombre_usuario: usuarioActual.nombre, id_producto: prodId,
         nombre_producto: prod.nombre, tipo: "RETIRO", cantidad, unidad: prod.unidad_medida,
         motivo: obs ? `${motivo} — ${obs}` : motivo, origen, destino: "consumo"
@@ -971,7 +1027,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click", async 
     }
 
     await addDoc(collection(db,"movimientos"), {
-      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid,
+      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
       nombre_usuario: usuarioActual.nombre, id_producto: prodId,
       nombre_producto: prod.nombre, tipo: "RETIRO", cantidad, unidad: prod.unidad_medida,
       motivo: obs ? `${motivo} — ${obs}` : motivo, origen: "acopio", destino
@@ -1039,7 +1095,7 @@ document.getElementById("btn-confirmar-venta").addEventListener("click", async (
   try {
     await updateDoc(doc(db,"productos",prodId), { [`stock_despacho.${sector}`]: increment(-cantidad) });
     await addDoc(collection(db,"movimientos"), {
-      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid,
+      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
       nombre_usuario: usuarioActual.nombre, id_producto: prodId,
       nombre_producto: prod.nombre, tipo: "VENTA", cantidad, unidad: prod.unidad_medida,
       motivo: obs || "Venta", origen: sector, destino: "salon",
@@ -1131,12 +1187,17 @@ function edmPoblarProductos(filtro) {
   if (actual && f.some(p => p.id === actual)) sel.value = actual;
 }
 
-// Llena el desplegable de motivos según el producto elegido, preservando selección
-function edmPoblarMotivos() {
+// Llena el desplegable de motivos según el producto elegido. Al ABRIR el modal
+// (desdeMovimiento=true) parte SIEMPRE del motivo real del movimiento; si no,
+// preserva la selección actual (cambio de producto dentro del modal). Sin esto,
+// al reabrir para otro retiro el <select> conservaba el motivo del anterior.
+function edmPoblarMotivos(desdeMovimiento = false) {
   const m = edmMov; if (!m) return;
   const prod = edmProdSel();
   const sel = document.getElementById("edm-motivo");
-  const prev = sel.value || (m.motivo || "").split(" — ")[0];
+  const prev = desdeMovimiento
+    ? (m.motivo || "").split(" — ")[0]
+    : (sel.value || (m.motivo || "").split(" — ")[0]);
   const desdeDespacho = !!(m.origen && m.origen !== "acopio");
   // Materia prima o retiro desde despacho: no se puede reponer → solo motivos sin transferencia
   let opciones = motivosSalida;
@@ -1157,7 +1218,7 @@ window.abrirEditarMotivo = (id) => {
   edmPoblarProductos("");
   document.getElementById("edm-producto").value = m.id_producto;
   document.getElementById("edm-cantidad").value = m.cantidad;
-  edmPoblarMotivos();
+  edmPoblarMotivos(true);
   document.getElementById("edm-confirm-eliminar").style.display = "none";
   document.getElementById("msg-editar-motivo").classList.remove("show");
   edmActualizar();
@@ -1619,7 +1680,7 @@ document.getElementById("btn-confirmar-ajuste").addEventListener("click", async 
   try {
     await updateDoc(doc(db,"productos",prodId), update);
     await addDoc(collection(db,"movimientos"), {
-      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid,
+      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
       nombre_usuario: usuarioActual.nombre, id_producto: prodId,
       nombre_producto: prod.nombre, tipo: "AJUSTE",
       cantidad: Math.abs(nuevoStock - stockAnterior), unidad: prod.unidad_medida,

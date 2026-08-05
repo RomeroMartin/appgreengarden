@@ -1,7 +1,7 @@
 // E2E editar/eliminar movimientos (vista Gerente): reverse + apply con increment.
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import { seedDefaults, loadView, store, setValue, setSelect, click, callGlobal } from "../harness/env.mjs";
+import { seedDefaults, loadView, store, setValue, setSelect, click, callGlobal, byId } from "../harness/env.mjs";
 
 const ts = (offset = 0) => new store.Ts(Date.now() - offset);
 
@@ -52,6 +52,18 @@ test("editar la cantidad de una reposición ajusta acopio Y el sector, de forma 
   const p = store.get("productos", "p-cerveza");
   assert.equal(p.stock_deposito, acopio + 3);
   assert.equal(p.stock_despacho.Barra, barra - 3);
+});
+
+test("reabrir 'editar retiro' para otro movimiento muestra SU motivo, no el del anterior", async () => {
+  // Abrir primero un retiro cuyo motivo ("2 - Vencimiento") es válido también
+  // para el segundo producto: así el <select> queda con un valor que, de no
+  // reinicializarse, se arrastraría al reabrir para otro movimiento.
+  await callGlobal("abrirEditarMotivo", "mov-ret");
+  assert.equal(byId("edm-motivo").value, "2 - Vencimiento");
+  // Reabrir para una reposición: debe preseleccionar SU motivo ("1 - Reposición"),
+  // no conservar "2 - Vencimiento" del movimiento anterior.
+  await callGlobal("abrirEditarMotivo", "mov-repo");
+  assert.equal(byId("edm-motivo").value, "1 - Reposición");
 });
 
 test("eliminar un retiro devuelve el stock y borra el registro", async () => {

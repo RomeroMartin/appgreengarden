@@ -1,4 +1,4 @@
-# CONTEXTO COMPLETO — Green Garden Inventario (v3.9.0)
+# CONTEXTO COMPLETO — Green Garden Inventario (v3.10.0)
 
 > Pegá este documento al iniciar una conversación nueva. Resume TODO el proyecto: qué es, cómo está hecho técnicamente, la lógica de negocio, la UX/UI, el estado actual y lo que queda pendiente. Está escrito para que una instancia nueva de Claude entienda el proyecto sin necesidad de la conversación anterior.
 
@@ -284,7 +284,18 @@ Lleva, por cada producto de despacho, hasta qué fecha están cargadas sus venta
 
 ---
 
-## 14. ESTADO ACTUAL (v3.9.0) — qué se hizo recientemente
+## 14. ESTADO ACTUAL (v3.10.0) — qué se hizo recientemente
+
+**v3.10.0 (features):**
+- **Venta manual permite negativo:** ya no bloquea por stock insuficiente; registra la venta y deja el sector en negativo como señal de faltante (unificado con el importador). Los retiros conservan su guard.
+- **Rendimiento recalcula recetas:** cambiar el rendimiento/subunidad de una materia prima recalcula la cantidad base de las recetas que la usan en subunidad, sin reabrirlas a mano.
+- **Buscador en el catálogo de Productos** (Gerente): filtra por nombre o PLU.
+- **Bajo mínimo colapsable en Encargado:** mismo desplegable que Gerente/Administrador.
+
+**v3.9.1 (pulido de cositas):**
+- **Conteo físico atómico:** el ajuste de stock y sus movimientos de historial van en un mismo `writeBatch` por producto (antes el movimiento era un `addDoc` suelto).
+- **`id_usuario` consistente:** todos los módulos escriben `auth.currentUser?.uid || null` (nunca `undefined`).
+- **Fix UX editar retiro:** al reabrir el modal para otro movimiento, el motivo se preselecciona con el del movimiento real, no con el del anterior. Con test e2e de regresión.
 
 **v3.9.0 (auditoría de stock + tests):**
 - **Ajustes atómicos:** ajuste rápido y conteo físico pasan de escribir valor absoluto a aplicar el **delta con `increment()`** → dejan de pisar ventas/reposiciones concurrentes (era la causa probable de las inconsistencias de stock).
@@ -308,22 +319,28 @@ Lleva, por cada producto de despacho, hasta qué fecha están cargadas sus venta
 1. **Atomicidad / condición de carrera** — RESUELTO. **Todas** las operaciones de stock usan `increment()` atómico (entradas, retiros/transferencias, ventas manuales, importación, descuento de ingredientes, editar/eliminar movimientos y **los dos ajustes**). El ajuste rápido y el conteo físico eran los únicos que escribían absoluto y pisaban cambios concurrentes; ahora aplican el delta.
 2. **Doble importación** — RESUELTO. Guarda anti-solapamiento en el importador (ver 7.3).
 
+### ✅ Resueltos en v3.9.1 (pulido de cositas)
+- **🟢 Conteo físico atómico** — RESUELTO. El update de stock y sus movimientos de historial ahora van en un mismo `writeBatch` por producto (`conteo-fisico.js`): o se aplican los dos, o ninguno. Antes el movimiento iba en un `addDoc` suelto y podía quedar sin su ajuste de stock (o al revés).
+- **🟢 `id_usuario` consistente** — RESUELTO. Todos los módulos escriben `id_usuario: auth.currentUser?.uid || null` (antes los cargadores no tenían el `|| null`, así que sin sesión escribían `undefined` y Firestore borraba el campo). El `nombre_usuario` sigue viniendo del usuario actual pasado a cada módulo.
+- **🟢 UX (editar retiro)** — RESUELTO. Al reabrir "editar retiro" para OTRO movimiento, el `<select>` de motivo ahora parte SIEMPRE del motivo real del movimiento (`edmPoblarMotivos(desdeMovimiento=true)` al abrir; el cambio de producto dentro del modal sigue preservando la selección). Antes conservaba el valor del movimiento anterior si era válido para el nuevo producto. Cubierto por un test e2e de regresión en `test/e2e/movimientos.test.mjs`.
+
+### ✅ Resueltos en v3.10.0 (features)
+- **🟡 Recorte de venta unificado** — RESUELTO. La **venta manual** ya no bloquea por stock insuficiente: SIEMPRE registra la venta y deja el sector en negativo (señal de faltante), igual que el importador. Los **retiros** conservan su guard (bloquear un sobre-retiro físico es intencional; hay tests que lo exigen). Test en `test/e2e/administrador.test.mjs`.
+- **🟢 Rendimiento recalcula recetas** — RESUELTO. Al editar el rendimiento / subunidad / unidad base de una materia prima, las recetas que la usan **en subunidad** recalculan su `cantidad` base (`cantidad = cant_in / rendimiento_nuevo`) automáticamente (`recalcularRecetasPorRendimiento` en `gerente.js`). Test en `test/e2e/rendimiento.test.mjs`.
+- **🟢 Buscador de catálogo** — nuevo `#prod-buscar` en la pestaña Productos del Gerente: filtra la lista por nombre o PLU para editar rápido. Test en `test/e2e/productos.test.mjs`.
+- **🟢 Bajo mínimo colapsable en Encargado** — la sección "Productos bajo mínimo" del Encargado ahora es un desplegable (header + chevron + conteo), igual que Gerente y Administrador. Test en `test/e2e/alertas-encargado.test.mjs`. (Entradas y Salidas no tienen lista de bajo mínimo: solo muestran el stock del producto seleccionado.)
+
 ### Pendientes (ninguno bloqueante)
-- **🟡 Inconsistencia de recorte:** venta manual y retiros usan `Math.max(0,...)` (recortan a 0); el importador permite negativo (señal útil). Decisión pendiente: unificar criterio (recomendado: permitir negativo en ventas también).
-- **🟢 Conteo físico:** el stock ya va con `increment`, pero el movimiento de historial se registra en un `addDoc` aparte (no en el mismo batch que el update). Riesgo bajo.
-- **🟢 `id_usuario` inconsistente:** importador y conteo usan `_usuarioActual`/`auth.currentUser`; los cargadores usan `auth.currentUser?.uid`.
-- **🟢 Venta de receta:** no deja un movimiento del trago en sí, solo de cada ingrediente (no hay línea "se vendieron 5 gin tonic" en el historial).
-- **🟢 Rendimiento:** cambiar el rendimiento de un producto no recalcula automáticamente las recetas que lo usan (hay que reabrir y guardar).
-- **🟢 UX menor (editar retiro):** al reabrir el modal de "editar retiro" para OTRO movimiento, el `<select>` de motivo conserva el valor del anterior (`prev = sel.value || m.motivo`); si el motivo previo es válido para el nuevo producto, queda seleccionado en vez del motivo real del movimiento. Conviene inicializarlo siempre con `m.motivo`.
+- **🟢 Venta de receta:** no deja un movimiento del trago en sí, solo de cada ingrediente (no hay línea "se vendieron 5 gin tonic" en el historial). **Descartado por decisión del cliente: no se necesita.**
 
 ---
 
-## 16. TESTS Y SIMULADOR DE VISTAS (v3.9.0)
+## 16. TESTS Y SIMULADOR DE VISTAS (v3.10.0)
 
 Hay una suite de tests que corre **sin navegador ni Firebase real** con `npm test` (unit + e2e). Sirve como red de seguridad para cambios futuros.
 
 ```bash
-npm test          # 62 tests (9 unit + 53 e2e)
+npm test          # 67 tests (9 unit + 58 e2e)
 npm run test:unit # lógica de fechas del corte de ventas
 npm run test:e2e  # simulador de las 5 vistas
 ```
@@ -346,4 +363,4 @@ Cubre las 5 vistas y toda la lógica de stock: entradas, retiros/transferencias,
 
 ---
 
-*Fin del contexto. La app está en v3.9.0, operativa y deployada. Para continuar: trabajar sobre el repo, correr `npm test` ante cualquier cambio de stock, y seguir las convenciones de la sección 13.*
+*Fin del contexto. La app está en v3.10.0, operativa y deployada. Para continuar: trabajar sobre el repo, correr `npm test` ante cualquier cambio de stock, y seguir las convenciones de la sección 13.*

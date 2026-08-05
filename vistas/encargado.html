@@ -53,8 +53,11 @@
     <div class="tab-content active" id="tab-inventario">
       <div id="seccion-alertas" style="display:none;margin-bottom:14px;">
         <div style="background:var(--critico-bg);border:1px solid #F5C6C5;border-radius:var(--radio);padding:14px 16px;">
-          <p style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--critico-txt);margin-bottom:10px;display:flex;align-items:center;gap:5px;"><svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 4 3 17.5a1.6 1.6 0 0 0 1.4 2.4h15.2a1.6 1.6 0 0 0 1.4-2.4L13.4 4a1.6 1.6 0 0 0-2.8 0Z"/><path d="M12 9.5v4"/><path d="M12 17h.01"/></svg>Productos bajo mínimo</p>
-          <div id="lista-alertas"></div>
+          <div id="alertas-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;">
+            <p style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--critico-txt);margin:0;display:flex;align-items:center;gap:5px;"><svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 4 3 17.5a1.6 1.6 0 0 0 1.4 2.4h15.2a1.6 1.6 0 0 0 1.4-2.4L13.4 4a1.6 1.6 0 0 0-2.8 0Z"/><path d="M12 9.5v4"/><path d="M12 17h.01"/></svg>Productos bajo mínimo <span id="alertas-count"></span></p>
+            <span id="alertas-chevron" style="color:var(--critico-txt);font-size:0.8rem;transition:transform .2s;">▼</span>
+          </div>
+          <div id="lista-alertas" style="margin-top:10px;display:none;"></div>
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:8px;">

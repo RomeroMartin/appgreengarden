@@ -77,12 +77,25 @@ document.getElementById("filtro-sector").addEventListener("change",renderInventa
 document.getElementById("filtro-rubro").addEventListener("change",renderInventario);
 document.getElementById("filtro-busqueda").addEventListener("input",renderInventario);
 
+let alertasAbierto=false;
 function renderAlertas() {
   const alertas=productos.filter(p=>{const min=p.stock_minimo;return min!=null&&min!==""&&stockTotal(p)<=min;});
   const sec=document.getElementById("seccion-alertas"),lst=document.getElementById("lista-alertas");
   if(!alertas.length){sec.style.display="none";return;}
   sec.style.display="block";
+  document.getElementById("alertas-count").textContent=`(${alertas.length})`;
   lst.innerHTML=alertas.map(p=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(217,83,79,0.15);"><span style="font-size:0.88rem;font-weight:600;">${escHtml(p.nombre)}</span><span style="font-weight:700;color:var(--critico-txt);">${fmtN(stockTotal(p))} / ${p.stock_minimo} ${escHtml(p.unidad_medida||"")}</span></div>`).join("");
+  lst.style.display=alertasAbierto?"block":"none";
+  document.getElementById("alertas-chevron").style.transform=alertasAbierto?"rotate(180deg)":"";
+  const header=document.getElementById("alertas-header");
+  if(header&&!header.dataset.wired){
+    header.dataset.wired="1";
+    header.addEventListener("click",()=>{
+      alertasAbierto=!alertasAbierto;
+      lst.style.display=alertasAbierto?"block":"none";
+      document.getElementById("alertas-chevron").style.transform=alertasAbierto?"rotate(180deg)":"";
+    });
+  }
 }
 
 function renderInventario() {
@@ -157,7 +170,7 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click",async(
   if(!prod||cantidad<=0){mostrarMsg(msgEl,"error","Completá los campos.");return;}
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
-    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo,cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"externo",destino:"acopio"});
+    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo,cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"externo",destino:"acopio"});
     await updateDoc(doc(db,"productos",prodId),{stock_deposito:increment(cantidad)});
     mostrarMsg(msgEl,"ok",`✓ ${cantidad} ${prod.unidad_medida} ingresados al acopio.`);
     document.getElementById("ent-cantidad").value="1"; cargarMovimientos();
@@ -266,7 +279,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click",async()
       await updateDoc(doc(db,"productos",prodId),{[`stock_despacho.${origen}`]:increment(-cantidad)});
       if(!prod.stock_despacho)prod.stock_despacho={};
       prod.stock_despacho[origen]=Math.max(0,stockSector-cantidad);
-      await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen,destino:"consumo"});
+      await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen,destino:"consumo"});
       mostrarMsg(msgEl,"ok",`✓ Retiro de ${cantidad} ${prod.unidad_medida} desde ${origen}.`);
       document.getElementById("sal-cantidad").value="1"; cargarMovimientos();
     }catch(err){mostrarMsg(msgEl,"error","Error: "+err.message);}
@@ -291,7 +304,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click",async()
     }else{
       await updateDoc(doc(db,"productos",prodId),{stock_deposito:increment(-cantidad)});
     }
-    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"acopio",destino});
+    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"acopio",destino});
     mostrarMsg(msgEl,"ok",destino!=="consumo"?`✓ Retiro de ${cantidad} ${prod.unidad_medida} → ${destino}.`:`✓ Retiro registrado (${motivo}).`);
     document.getElementById("sal-cantidad").value="1"; cargarMovimientos();
   }catch(err){mostrarMsg(msgEl,"error","Error: "+err.message);}
