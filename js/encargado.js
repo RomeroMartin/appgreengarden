@@ -157,7 +157,7 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click",async(
   if(!prod||cantidad<=0){mostrarMsg(msgEl,"error","Completá los campos.");return;}
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
-    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo,cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"externo",destino:"acopio"});
+    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo,cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"externo",destino:"acopio"});
     await updateDoc(doc(db,"productos",prodId),{stock_deposito:increment(cantidad)});
     mostrarMsg(msgEl,"ok",`✓ ${cantidad} ${prod.unidad_medida} ingresados al acopio.`);
     document.getElementById("ent-cantidad").value="1"; cargarMovimientos();
@@ -266,7 +266,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click",async()
       await updateDoc(doc(db,"productos",prodId),{[`stock_despacho.${origen}`]:increment(-cantidad)});
       if(!prod.stock_despacho)prod.stock_despacho={};
       prod.stock_despacho[origen]=Math.max(0,stockSector-cantidad);
-      await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen,destino:"consumo"});
+      await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen,destino:"consumo"});
       mostrarMsg(msgEl,"ok",`✓ Retiro de ${cantidad} ${prod.unidad_medida} desde ${origen}.`);
       document.getElementById("sal-cantidad").value="1"; cargarMovimientos();
     }catch(err){mostrarMsg(msgEl,"error","Error: "+err.message);}
@@ -291,7 +291,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click",async()
     }else{
       await updateDoc(doc(db,"productos",prodId),{stock_deposito:increment(-cantidad)});
     }
-    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"acopio",destino});
+    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"acopio",destino});
     mostrarMsg(msgEl,"ok",destino!=="consumo"?`✓ Retiro de ${cantidad} ${prod.unidad_medida} → ${destino}.`:`✓ Retiro registrado (${motivo}).`);
     document.getElementById("sal-cantidad").value="1"; cargarMovimientos();
   }catch(err){mostrarMsg(msgEl,"error","Error: "+err.message);}

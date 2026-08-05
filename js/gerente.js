@@ -800,7 +800,7 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click", async
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
     await addDoc(collection(db,"movimientos"), {
-      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid,
+      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
       nombre_usuario: usuarioActual.nombre, id_producto: prodId,
       nombre_producto: prod.nombre, tipo, cantidad, unidad: prod.unidad_medida,
       motivo: obs ? `${motivo} — ${obs}` : motivo, origen: "externo", destino: "acopio"
@@ -931,7 +931,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click", async 
         [`stock_despacho.${origen}`]: increment(-cantidad)
       });
       await addDoc(collection(db,"movimientos"), {
-        fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid,
+        fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
         nombre_usuario: usuarioActual.nombre, id_producto: prodId,
         nombre_producto: prod.nombre, tipo: "RETIRO", cantidad, unidad: prod.unidad_medida,
         motivo: obs ? `${motivo} — ${obs}` : motivo, origen, destino: "consumo"
@@ -971,7 +971,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click", async 
     }
 
     await addDoc(collection(db,"movimientos"), {
-      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid,
+      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
       nombre_usuario: usuarioActual.nombre, id_producto: prodId,
       nombre_producto: prod.nombre, tipo: "RETIRO", cantidad, unidad: prod.unidad_medida,
       motivo: obs ? `${motivo} — ${obs}` : motivo, origen: "acopio", destino
@@ -1039,7 +1039,7 @@ document.getElementById("btn-confirmar-venta").addEventListener("click", async (
   try {
     await updateDoc(doc(db,"productos",prodId), { [`stock_despacho.${sector}`]: increment(-cantidad) });
     await addDoc(collection(db,"movimientos"), {
-      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid,
+      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
       nombre_usuario: usuarioActual.nombre, id_producto: prodId,
       nombre_producto: prod.nombre, tipo: "VENTA", cantidad, unidad: prod.unidad_medida,
       motivo: obs || "Venta", origen: sector, destino: "salon",
@@ -1131,12 +1131,17 @@ function edmPoblarProductos(filtro) {
   if (actual && f.some(p => p.id === actual)) sel.value = actual;
 }
 
-// Llena el desplegable de motivos según el producto elegido, preservando selección
-function edmPoblarMotivos() {
+// Llena el desplegable de motivos según el producto elegido. Al ABRIR el modal
+// (desdeMovimiento=true) parte SIEMPRE del motivo real del movimiento; si no,
+// preserva la selección actual (cambio de producto dentro del modal). Sin esto,
+// al reabrir para otro retiro el <select> conservaba el motivo del anterior.
+function edmPoblarMotivos(desdeMovimiento = false) {
   const m = edmMov; if (!m) return;
   const prod = edmProdSel();
   const sel = document.getElementById("edm-motivo");
-  const prev = sel.value || (m.motivo || "").split(" — ")[0];
+  const prev = desdeMovimiento
+    ? (m.motivo || "").split(" — ")[0]
+    : (sel.value || (m.motivo || "").split(" — ")[0]);
   const desdeDespacho = !!(m.origen && m.origen !== "acopio");
   // Materia prima o retiro desde despacho: no se puede reponer → solo motivos sin transferencia
   let opciones = motivosSalida;
@@ -1157,7 +1162,7 @@ window.abrirEditarMotivo = (id) => {
   edmPoblarProductos("");
   document.getElementById("edm-producto").value = m.id_producto;
   document.getElementById("edm-cantidad").value = m.cantidad;
-  edmPoblarMotivos();
+  edmPoblarMotivos(true);
   document.getElementById("edm-confirm-eliminar").style.display = "none";
   document.getElementById("msg-editar-motivo").classList.remove("show");
   edmActualizar();
@@ -1619,7 +1624,7 @@ document.getElementById("btn-confirmar-ajuste").addEventListener("click", async 
   try {
     await updateDoc(doc(db,"productos",prodId), update);
     await addDoc(collection(db,"movimientos"), {
-      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid,
+      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
       nombre_usuario: usuarioActual.nombre, id_producto: prodId,
       nombre_producto: prod.nombre, tipo: "AJUSTE",
       cantidad: Math.abs(nuevoStock - stockAnterior), unidad: prod.unidad_medida,

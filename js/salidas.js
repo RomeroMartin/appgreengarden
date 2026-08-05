@@ -178,7 +178,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click", async 
       await updateDoc(doc(db,"productos",prodId), { [`stock_despacho.${origen}`]: increment(-cantidad) });
       if(!prod.stock_despacho)prod.stock_despacho={};
       prod.stock_despacho[origen]=Math.max(0,stockSector-cantidad);
-      await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen,destino:"consumo"});
+      await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen,destino:"consumo"});
       actualizarInfo();
       mostrarFlash(`↓ Retiro desde ${origen}`);
       document.getElementById("sal-cantidad").value="1";
@@ -217,7 +217,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click", async 
     }
     prod.stock_deposito=Math.max(0,(prod.stock_deposito??0)-cantidad);
 
-    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"acopio",destino});
+    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo:"RETIRO",cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"acopio",destino});
 
     actualizarInfo();
     mostrarFlash(destino !== "consumo" ? `↓ Retiro → ${destino}` : `↓ ${motivo} registrado`);

@@ -83,7 +83,7 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click", async
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
     await addDoc(collection(db,"movimientos"), {
-      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid,
+      fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
       nombre_usuario: usuarioActual.nombre, id_producto: prodId,
       nombre_producto: prod.nombre, tipo, cantidad, unidad: prod.unidad_medida,
       motivo: obs ? `${motivo} — ${obs}` : motivo, origen: "externo", destino: "acopio"

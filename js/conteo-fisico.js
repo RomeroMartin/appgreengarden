@@ -6,7 +6,7 @@
 
 import { auth, db } from "./firebase-config.js";
 import {
-  collection, doc, getDocs, updateDoc, addDoc, serverTimestamp, increment
+  collection, doc, getDocs, serverTimestamp, increment, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const esDespacho = p => p.tipo === "Despacho";
@@ -113,12 +113,16 @@ async function aplicar() {
       // si mientras se cuenta entran ventas/reposiciones, un write absoluto las
       // BORRABA. Con increment el ajuste corrige solo la diferencia y compone con
       // esos movimientos (igual que entradas/salidas/importación).
+      // El update de stock y sus movimientos de historial van en un mismo
+      // writeBatch: o se aplican los dos, o ninguno (antes el movimiento iba en
+      // un addDoc suelto y podía quedar sin su ajuste de stock, o al revés).
+      const batch = writeBatch(db);
       const update = {};
       if (c.acopio !== undefined) {
         const anterior = prod.stock_deposito ?? 0;
         if (c.acopio !== anterior) {
           update.stock_deposito = increment(c.acopio - anterior);
-          await addDoc(collection(db, "movimientos"), {
+          batch.set(doc(collection(db, "movimientos")), {
             fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
             nombre_usuario: _usuarioActual.nombre, id_producto: id, nombre_producto: prod.nombre,
             tipo: "AJUSTE", cantidad: Math.abs(c.acopio - anterior), unidad: prod.unidad_medida,
@@ -132,7 +136,7 @@ async function aplicar() {
           const anterior = prod.stock_despacho?.[s] ?? 0;
           if (c.despacho[s] !== anterior) {
             update[`stock_despacho.${s}`] = increment(c.despacho[s] - anterior);
-            await addDoc(collection(db, "movimientos"), {
+            batch.set(doc(collection(db, "movimientos")), {
               fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
               nombre_usuario: _usuarioActual.nombre, id_producto: id, nombre_producto: prod.nombre,
               tipo: "AJUSTE", cantidad: Math.abs(c.despacho[s] - anterior), unidad: prod.unidad_medida,
@@ -143,7 +147,8 @@ async function aplicar() {
       }
       // Puede quedar vacío si lo contado coincide con lo mostrado → no se escribe.
       if (Object.keys(update).length) {
-        await updateDoc(doc(db, "productos", id), update);
+        batch.update(doc(db, "productos", id), update);
+        await batch.commit();
         cuenta++;
       }
     }
