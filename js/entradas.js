@@ -6,9 +6,10 @@
 import { auth, db } from "./firebase-config.js";
 import { protegerRuta, logout } from "./auth.js";
 import { escHtml } from "./core-inventario.js";
+import { calcularConsumoProduccion, agregarConsumoAlBatch } from "./produccion.js";
 import {
   collection, doc, addDoc, updateDoc, getDocs, onSnapshot,
-  query, orderBy, limit, where, serverTimestamp, increment
+  query, orderBy, limit, where, serverTimestamp, writeBatch, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 protegerRuta("Cargador Entradas");
@@ -82,14 +83,24 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click", async
   if (!prod || cantidad <= 0) { mostrarMsg(msgEl,"error","Completá los campos."); return; }
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
-    await addDoc(collection(db,"movimientos"), {
+    // Ingreso Producción + receta de producción → descuenta insumos en el mismo batch.
+    const consumos = (tipo === "INGRESO_PRODUCCION") ? calcularConsumoProduccion(prod, cantidad) : [];
+    const batch = writeBatch(db);
+    const movRef = doc(collection(db,"movimientos"));
+    batch.set(movRef, {
       fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
       nombre_usuario: usuarioActual.nombre, id_producto: prodId,
       nombre_producto: prod.nombre, tipo, cantidad, unidad: prod.unidad_medida,
-      motivo: obs ? `${motivo} — ${obs}` : motivo, origen: "externo", destino: "acopio"
+      motivo: obs ? `${motivo} — ${obs}` : motivo, origen: "externo", destino: "acopio",
+      ...(consumos.length ? { consumo_produccion: consumos } : {})
     });
-    await updateDoc(doc(db,"productos",prodId), { stock_deposito: increment(cantidad) });
+    batch.update(doc(db,"productos",prodId), { stock_deposito: increment(cantidad) });
+    agregarConsumoAlBatch(batch, { plato: prod, consumos, produccionId: movRef.id,
+      usuarioNombre: usuarioActual.nombre, existe: (pid) => productos.some(p => p.id === pid) });
+    await batch.commit();
     prod.stock_deposito = (prod.stock_deposito??0) + cantidad;
+    // Reflejo local del consumo de insumos (permite negativo)
+    for (const c of consumos) { const ins = productos.find(p => p.id === c.id); if (ins) ins.stock_deposito = (ins.stock_deposito??0) - c.cantidad; }
     actualizarInfo();
     mostrarFlash();
     document.getElementById("ent-cantidad").value = "1";

@@ -9,6 +9,7 @@ import { protegerRuta, logout } from "./auth.js";
 import { initImportador, abrirImportador, actualizarProductosImportador } from "./importador-ventas.js";
 import { renderResumen, badgeProducto, calcularResumen, debeAvanzar } from "./corte-ventas.js";
 import { initConteo, abrirConteo, setProductosConteo } from "./conteo-fisico.js";
+import { calcularConsumoProduccion, agregarConsumoAlBatch } from "./produccion.js";
 import {
   escHtml, fmtN, esDespacho, esReceta, sectoresDe, stockTotal, getBadge, acopioBajoOcero,
   origenRetiroActual, aDatetimeLocal, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida,
@@ -347,9 +348,14 @@ function aplicarVistaTipo(tipo) {
   document.getElementById("prod-unidad").closest(".form-group").style.display    = esRec ? "none" : "";
   document.getElementById("prod-sector").closest(".form-group").style.display    = esRec ? "none" : "";
   document.getElementById("grupo-rendimiento").style.display                     = esRec ? "none" : "";
+  // Receta de PRODUCCIÓN: solo para productos con stock (Despacho / Materia prima),
+  // que son los que se elaboran con un Ingreso Producción. Las recetas de barra no.
+  document.getElementById("grupo-receta-produccion").style.display               = esRec ? "none" : "";
   if (esRec) {
     document.getElementById("prod-receta-varia").checked = recetaState.porVariantes;
     renderRecetaEditor();
+  } else {
+    renderRecetaProd();
   }
 }
 
@@ -569,6 +575,98 @@ document.getElementById("receta-editor").addEventListener("input", (e) => {
   }
 });
 
+// ── EDITOR DE RECETA DE PRODUCCIÓN (insumos consumidos al Ingreso Producción) ──
+// Lista plana de insumos POR PORCIÓN. Mismo formato de ingrediente que las recetas
+// de barra { id, nombre, cantidad(base), unidad, cant_in, unidad_in }, pero se
+// consume al PRODUCIR (no al vender). El descuento vive en produccion.js.
+let recetaProdState = [];
+
+function renderRecetaProdLista() {
+  const cont = document.getElementById("prodrec-lista");
+  if (!recetaProdState.length) {
+    cont.innerHTML = '<p style="font-size:0.76rem;color:var(--texto-3);margin:0;">Sin insumos. Este producto no descuenta nada al producirse.</p>';
+    return;
+  }
+  cont.innerHTML = recetaProdState.map((ing, i) => {
+    const disp = (ing.cant_in != null && ing.unidad_in) ? `${ing.cant_in} ${escHtml(ing.unidad_in)}` : `${ing.cantidad} ${escHtml(ing.unidad)}`;
+    const conv = (ing.unidad_in && ing.unidad_in !== ing.unidad)
+      ? ` <span style="color:var(--texto-3);font-size:0.72rem;">(= ${+(+ing.cantidad).toFixed(4)} ${escHtml(ing.unidad)})</span>` : "";
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;${i>0?'border-top:1px solid var(--borde);':''}">
+      <span style="font-size:0.83rem;">${disp.replace(/^(\S+)/, '<strong>$1</strong>')} de ${escHtml(ing.nombre)}${conv} <span style="color:var(--texto-3);">/ porción</span></span>
+      <button type="button" class="btn-icono danger" data-idx="${i}" style="padding:2px 7px;">${icono("eliminar",{size:16})}</button>
+    </div>`;
+  }).join("");
+}
+
+// Repuebla el select de insumos (optsIngredientes ya excluye recetas; además saca el propio producto)
+function prodrecPoblarMat(filtro = "") {
+  const sel = document.getElementById("prodrec-mat");
+  const propioId = document.getElementById("prod-id").value;
+  sel.innerHTML = optsIngredientes(filtro);
+  if (propioId) [...sel.options].forEach(o => { if (o.value === propioId) o.remove(); });
+  const t = (filtro || "").trim();
+  const primerReal = [...sel.options].find(o => o.value);
+  if (t && primerReal) sel.value = primerReal.value;
+  const prod = productos.find(p => p.id === sel.value);
+  document.getElementById("prodrec-unidad").innerHTML = optsUnidadIngrediente(prod);
+  actualizarHintProdrec();
+}
+
+function actualizarHintProdrec() {
+  const hint = document.getElementById("prodrec-hint");
+  const prod = productos.find(p => p.id === document.getElementById("prodrec-mat").value);
+  const cant = parseFloat(document.getElementById("prodrec-cant").value);
+  const uni  = document.getElementById("prodrec-unidad").value;
+  if (!prod || isNaN(cant) || cant <= 0) { hint.textContent = ""; return; }
+  const esSub = prod.rendimiento > 0 && prod.subunidad && uni === prod.subunidad;
+  hint.textContent = esSub ? `= ${+(cant / prod.rendimiento).toFixed(4)} ${prod.unidad_medida || ""} por porción (lo que se descuenta)` : "";
+}
+
+function renderRecetaProd() {
+  renderRecetaProdLista();
+  prodrecPoblarMat(document.getElementById("prodrec-buscar")?.value || "");
+}
+
+document.getElementById("prodrec-buscar").addEventListener("input", (e) => { prodrecPoblarMat(e.target.value); });
+document.getElementById("prodrec-mat").addEventListener("change", () => {
+  const prod = productos.find(p => p.id === document.getElementById("prodrec-mat").value);
+  document.getElementById("prodrec-unidad").innerHTML = optsUnidadIngrediente(prod);
+  actualizarHintProdrec();
+});
+document.getElementById("prodrec-cant").addEventListener("input", actualizarHintProdrec);
+document.getElementById("prodrec-unidad").addEventListener("change", actualizarHintProdrec);
+document.getElementById("prodrec-lista").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-idx]"); if (!btn) return;
+  recetaProdState.splice(+btn.dataset.idx, 1);
+  renderRecetaProdLista();
+});
+document.getElementById("prodrec-add").addEventListener("click", () => {
+  const msgEl = document.getElementById("msg-producto");
+  const id = document.getElementById("prodrec-mat").value;
+  const cant = parseFloat(document.getElementById("prodrec-cant").value);
+  const propioId = document.getElementById("prod-id").value;
+  if (!id) { mostrarMsg(msgEl, "error", "Elegí un insumo del desplegable."); return; }
+  if (id === propioId) { mostrarMsg(msgEl, "error", "Un producto no puede ser insumo de sí mismo."); return; }
+  if (isNaN(cant) || cant <= 0) { mostrarMsg(msgEl, "error", "Poné una cantidad válida."); return; }
+  if (recetaProdState.some(i => i.id === id)) { mostrarMsg(msgEl, "error", "Ese insumo ya está en la receta."); return; }
+  const mat = productos.find(p => p.id === id);
+  if (!mat) return;
+  const unidadElegida = document.getElementById("prodrec-unidad").value || mat.unidad_medida || "";
+  const esSub = mat.rendimiento > 0 && mat.subunidad && unidadElegida === mat.subunidad;
+  const base  = esSub ? (cant / mat.rendimiento) : cant;
+  recetaProdState.push({
+    id, nombre: mat.nombre,
+    cantidad: +base.toFixed(6),
+    unidad: mat.unidad_medida || "",
+    cant_in: cant,
+    unidad_in: unidadElegida
+  });
+  document.getElementById("prodrec-cant").value = "";
+  document.getElementById("prodrec-hint").textContent = "";
+  msgEl.classList.remove("show");
+  renderRecetaProdLista();
+});
+
 document.getElementById("btn-nuevo-producto").addEventListener("click", () => {
   document.getElementById("modal-producto-titulo").textContent = "Nuevo producto";
   document.getElementById("prod-id").value        = "";
@@ -580,6 +678,8 @@ document.getElementById("btn-nuevo-producto").addEventListener("click", () => {
   document.getElementById("prod-subunidad").value   = "";
   document.getElementById("prod-tipo").value      = "Despacho";
   recetaState = freshRecetaState();
+  recetaProdState = [];
+  document.getElementById("prodrec-buscar").value = "";
   document.getElementById("prod-receta-varia").checked = false;
   renderChecksDespacho([]);
   aplicarVistaTipo("Despacho");
@@ -614,6 +714,9 @@ window.abrirEditarProducto = (id) => {
   } else {
     recetaState = freshRecetaState();
   }
+  // Receta de producción (solo productos con stock): copia editable
+  recetaProdState = (p.receta_produccion || []).map(i => ({ ...i }));
+  document.getElementById("prodrec-buscar").value = "";
   aplicarVistaTipo(p.tipo || "Materia prima");
   document.getElementById("msg-producto").classList.remove("show");
   setTimeout(() => {
@@ -662,6 +765,12 @@ async function recalcularRecetasPorRendimiento(prodId, nuevoRend, nuevaSub, nuev
       if (nuevos) await updateDoc(doc(db, "productos", r.id), { ingredientes: nuevos });
     }
   }
+  // También las recetas de PRODUCCIÓN que usan este insumo en subunidad.
+  for (const p of productos) {
+    if (!(p.receta_produccion && p.receta_produccion.length) || p.id === prodId) continue;
+    const nuevos = fix(p.receta_produccion);
+    if (nuevos) await updateDoc(doc(db, "productos", p.id), { receta_produccion: nuevos });
+  }
 }
 
 document.getElementById("btn-guardar-producto").addEventListener("click", async () => {
@@ -682,6 +791,8 @@ document.getElementById("btn-guardar-producto").addEventListener("click", async 
   const fraccionData = (tipo !== "Receta" && rendVal > 0 && subVal)
     ? { rendimiento: rendVal, subunidad: subVal }
     : { rendimiento: null, subunidad: null };
+  // Receta de producción: solo la guardan los productos con stock (no las recetas de barra).
+  const recetaProdData = { receta_produccion: (tipo !== "Receta") ? recetaProdState.map(i => ({ ...i })) : [] };
   const msgEl   = document.getElementById("msg-producto");
   const btn     = document.getElementById("btn-guardar-producto");
 
@@ -738,6 +849,7 @@ document.getElementById("btn-guardar-producto").addEventListener("click", async 
         sectores_asignados: tipo === "Despacho" ? seleccionados : [],
         ...minData,
         ...fraccionData,
+        ...recetaProdData,
         ...datosReceta
       };
       // Si el producto deja de ser de Despacho, su mapa de despacho ya no aplica.
@@ -763,6 +875,7 @@ document.getElementById("btn-guardar-producto").addEventListener("click", async 
         stock_despacho: despachoInit,
         ...minData,
         ...fraccionData,
+        ...recetaProdData,
         ...datosReceta
       });
     }
@@ -855,14 +968,24 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click", async
   if (!prod || cantidad <= 0) { mostrarMsg(msgEl,"error","Completá los campos."); return; }
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
-    await addDoc(collection(db,"movimientos"), {
+    // Si es Ingreso Producción y el producto tiene receta de producción, se
+    // descuentan los insumos del acopio en el MISMO batch (atómico).
+    const consumos = (tipo === "INGRESO_PRODUCCION") ? calcularConsumoProduccion(prod, cantidad) : [];
+    const batch = writeBatch(db);
+    const movRef = doc(collection(db,"movimientos"));
+    batch.set(movRef, {
       fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null,
       nombre_usuario: usuarioActual.nombre, id_producto: prodId,
       nombre_producto: prod.nombre, tipo, cantidad, unidad: prod.unidad_medida,
-      motivo: obs ? `${motivo} — ${obs}` : motivo, origen: "externo", destino: "acopio"
+      motivo: obs ? `${motivo} — ${obs}` : motivo, origen: "externo", destino: "acopio",
+      ...(consumos.length ? { consumo_produccion: consumos } : {})
     });
-    await updateDoc(doc(db,"productos",prodId), { stock_deposito: increment(cantidad) });
-    mostrarMsg(msgEl,"ok",`✓ ${cantidad} ${prod.unidad_medida} ingresados al acopio.`);
+    batch.update(doc(db,"productos",prodId), { stock_deposito: increment(cantidad) });
+    agregarConsumoAlBatch(batch, { plato: prod, consumos, produccionId: movRef.id,
+      usuarioNombre: usuarioActual.nombre, existe: (pid) => productos.some(p => p.id === pid) });
+    await batch.commit();
+    const extra = consumos.length ? ` · ${consumos.length} insumo(s) descontado(s)` : "";
+    mostrarMsg(msgEl,"ok",`✓ ${cantidad} ${prod.unidad_medida} ingresados al acopio${extra}.`);
     document.getElementById("ent-cantidad").value = "1";
     cargarMovRecientes();
   } catch(err) { mostrarMsg(msgEl,"error","Error: " + err.message); }
@@ -1524,13 +1647,27 @@ document.getElementById("btn-confirmar-editar-entrada").addEventListener("click"
   if (newProd.id === m.id_producto && newCant === m.cantidad) { mostrarMsg(msgEl,"error","No hiciste ningún cambio."); return; }
 
   const deltas = edeDeltas(true);
+  // Si es una producción, corregir = revertir el consumo viejo de insumos y
+  // aplicar el nuevo (según la receta del producto editado × la cantidad nueva).
+  const esProd = m.tipo === "INGRESO_PRODUCCION";
+  const oldConsumos = (esProd && Array.isArray(m.consumo_produccion)) ? m.consumo_produccion : [];
+  const newConsumos = esProd ? calcularConsumoProduccion(newProd, newCant) : [];
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
+    const linked = oldConsumos.length
+      ? (await getDocs(query(collection(db,"movimientos"), where("produccion_id","==",m.id)))).docs
+      : [];
     const batch = writeBatch(db);
     Object.keys(deltas).forEach(pid => {
       if (!productos.some(p => p.id === pid)) return;
       if (deltas[pid]) batch.update(doc(db,"productos",pid), { stock_deposito: increment(deltas[pid]) });
     });
+    // Revertir consumo viejo (devolver insumos + borrar sus movimientos)
+    for (const c of oldConsumos) if (productos.some(p => p.id === c.id)) batch.update(doc(db,"productos",c.id), { stock_deposito: increment(c.cantidad) });
+    for (const d of linked) batch.delete(doc(db,"movimientos", d.id));
+    // Aplicar consumo nuevo (descontar insumos + crear movimientos enlazados)
+    agregarConsumoAlBatch(batch, { plato: newProd, consumos: newConsumos, produccionId: m.id,
+      usuarioNombre: usuarioActual.nombre, existe: (pid) => productos.some(p => p.id === pid) });
     batch.update(doc(db,"movimientos",m.id), {
       id_producto: newProd.id,
       nombre_producto: newProd.nombre,
@@ -1538,12 +1675,16 @@ document.getElementById("btn-confirmar-editar-entrada").addEventListener("click"
       unidad: newProd.unidad_medida || m.unidad || "",
       corregido: true,
       cantidad_anterior: m.cantidad,
-      fecha_correccion: serverTimestamp()
+      fecha_correccion: serverTimestamp(),
+      ...(esProd ? { consumo_produccion: newConsumos } : {})
     });
     await batch.commit();
     edeAplicarLocal(deltas);
+    for (const c of oldConsumos) { const p = productos.find(x => x.id === c.id); if (p) p.stock_deposito = +(((p.stock_deposito ?? 0) + c.cantidad)).toFixed(4); }
+    for (const c of newConsumos) { const p = productos.find(x => x.id === c.id); if (p) p.stock_deposito = +(((p.stock_deposito ?? 0) - c.cantidad)).toFixed(4); }
     m.id_producto = newProd.id; m.nombre_producto = newProd.nombre; m.cantidad = newCant;
     m.unidad = newProd.unidad_medida || m.unidad || ""; m.corregido = true;
+    if (esProd) m.consumo_produccion = newConsumos;
     cerrarModal("modal-editar-entrada");
     cargarMovRecientes();
     renderStock();
@@ -1555,8 +1696,10 @@ document.getElementById("btn-confirmar-editar-entrada").addEventListener("click"
 document.getElementById("btn-eliminar-entrada").addEventListener("click", () => {
   if (!edeMov) return;
   const lineas = edeFmtDeltas(edeDeltas(false));
+  const hayConsumo = edeMov.tipo === "INGRESO_PRODUCCION" && Array.isArray(edeMov.consumo_produccion) && edeMov.consumo_produccion.length;
+  const nota = hayConsumo ? " También se devolverán al acopio los insumos consumidos en esta producción." : "";
   document.getElementById("ede-eliminar-preview").innerHTML =
-    `Se eliminará esta entrada y se revertirá el stock. ${lineas.length ? `Ajuste: <strong>${lineas.join(" · ")}</strong>.` : ""}`;
+    `Se eliminará esta entrada y se revertirá el stock.${nota} ${lineas.length ? `Ajuste: <strong>${lineas.join(" · ")}</strong>.` : ""}`;
   document.getElementById("ede-confirm-eliminar").style.display = "";
 });
 document.getElementById("btn-cancelar-eliminar-entrada").addEventListener("click", () => {
@@ -1568,16 +1711,24 @@ document.getElementById("btn-confirmar-eliminar-entrada").addEventListener("clic
   const btn = document.getElementById("btn-confirmar-eliminar-entrada");
   if (!m) return;
   const deltas = edeDeltas(false);
+  // Producción: además de revertir el plato, devolver los insumos y borrar sus movimientos.
+  const consumos = (m.tipo === "INGRESO_PRODUCCION" && Array.isArray(m.consumo_produccion)) ? m.consumo_produccion : [];
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
+    const linked = consumos.length
+      ? (await getDocs(query(collection(db,"movimientos"), where("produccion_id","==",m.id)))).docs
+      : [];
     const batch = writeBatch(db);
     Object.keys(deltas).forEach(pid => {
       if (!productos.some(p => p.id === pid)) return;
       if (deltas[pid]) batch.update(doc(db,"productos",pid), { stock_deposito: increment(deltas[pid]) });
     });
+    for (const c of consumos) if (productos.some(p => p.id === c.id)) batch.update(doc(db,"productos",c.id), { stock_deposito: increment(c.cantidad) });
+    for (const d of linked) batch.delete(doc(db,"movimientos", d.id));
     batch.delete(doc(db,"movimientos",m.id));
     await batch.commit();
     edeAplicarLocal(deltas);
+    for (const c of consumos) { const p = productos.find(x => x.id === c.id); if (p) p.stock_deposito = +(((p.stock_deposito ?? 0) + c.cantidad)).toFixed(4); }
     delete movIndex[m.id];
     movimientosCached = movimientosCached.filter(x => x.id !== m.id);
     cerrarModal("modal-editar-entrada");

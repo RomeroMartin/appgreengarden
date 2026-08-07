@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Green Garden — Manual de Usuario v3.11</title>
+<title>Green Garden — Manual de Usuario v3.12</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -250,7 +250,7 @@
     <h1>Manual de <em>Usuario</em></h1>
     <p class="sub">Todo lo que necesitás para manejar el stock del restaurante desde el celular o la computadora.</p>
     <div class="meta">
-      <span><strong>Versión 3.11</strong>Agosto 2026</span>
+      <span><strong>Versión 3.12</strong>Agosto 2026</span>
       <span><strong>Martin Romero Studio</strong>Desarrollo</span>
       <span><strong>control-stoks---green-garden.web.app</strong>Acceso</span>
     </div>
@@ -334,7 +334,7 @@
 
       <div class="nota">
         <span class="et">Ejemplo</span>
-        La harina (materia prima) se retira del acopio y se consume haciendo pizzas. La pizza terminada se carga como <strong>Ingreso Producción</strong> de un producto nuevo “Pizza” (de despacho), y de ahí sigue el circuito normal hasta la venta.
+        La pizza terminada se carga como <strong>Ingreso Producción</strong> de un producto “Pizza” (de despacho), y de ahí sigue el circuito normal hasta la venta. Si a la Pizza le cargás una <strong>receta de producción</strong> (harina, salsa, queso…), al hacer ese Ingreso Producción la app <strong>descuenta sola</strong> esas materias primas del acopio. (Ver sección 4.6.)
       </div>
     </section>
 
@@ -434,6 +434,23 @@
         <span class="et">Si cambiás el rendimiento después</span>
         Si más adelante editás el rendimiento de una materia prima (ej. la botella pasa de 700 a 750 ml), las recetas que la usan en subunidad se <strong>recalculan solas</strong>. No hace falta reabrir y volver a guardar cada trago.
       </div>
+
+      <h3><span class="n">4.6</span>Recetas de producción (cocina)</h3>
+      <p>Hay <strong>dos tipos de receta</strong>, según <strong>cuándo</strong> se consumen los insumos:</p>
+      <ul>
+        <li><strong>Receta de barra</strong> (la de arriba): el producto es del tipo <em>Receta</em>, no tiene stock propio y consume sus ingredientes <strong>al vender</strong>. Ej: un gin tonic.</li>
+        <li><strong>Receta de producción</strong>: el producto es de <em>despacho</em> normal (tiene stock), y consume sus insumos <strong>al producir</strong>, es decir al hacer el <strong>Ingreso Producción</strong>. Ej: los ñoquis, una salsa, una tarta.</li>
+      </ul>
+      <p>La receta de producción se carga <strong>por porción</strong> en el mismo formulario del producto (sección “Receta de producción”), agregando cada insumo con su cantidad. Cuando después hacés un <strong>Ingreso Producción</strong> de, por ejemplo, 50 porciones, la app suma esas 50 al stock del plato <strong>y descuenta del acopio</strong> los insumos (insumo × 50), dejando un movimiento por cada uno.</p>
+      <div class="nota">
+        <span class="et">Ejemplo cocina</span>
+        “Ñoqui” tiene receta de producción: 0,2 kg de harina + 0,5 kg de papa por porción. Producís 50 → entran 50 ñoquis al acopio y se descuentan 10 kg de harina y 25 kg de papa. Después los ñoquis se reponen al despacho y se venden como cualquier producto. <strong>La venta ya no toca las materias primas</strong> (se consumieron al producir).
+      </div>
+      <div class="nota">
+        <span class="et">Platos con salsa a elección</span>
+        Ñoqui y cada salsa son productos con su propia receta de producción. El plato que se vende (“Ñoqui”) se arma como una receta de barra <strong>por variantes</strong>, donde el <strong>Tamaño</strong> del Excel es la salsa — igual que Gin Tonic Nacional/Importado.
+      </div>
+      <p>Si al producir no alcanza un insumo, la app <strong>no te frena</strong>: lo deja en negativo como señal de que falta reponer. Y si <strong>editás o eliminás</strong> un Ingreso Producción (porque se cargó mal), se <strong>devuelven también los insumos</strong>. Si en cambio la tanda se echó a perder, no borres la producción: dale de baja al plato terminado con un retiro por <strong>Merma</strong> (los insumos ya se gastaron de verdad).</p>
     </section>
 
     <!-- 5 -->
