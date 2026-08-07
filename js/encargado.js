@@ -11,6 +11,7 @@ import {
   instalarCandadoMotivoReposicion
 } from "./core-inventario.js";
 import { icono } from "./iconos.js";
+import { calcularConsumoProduccion, agregarConsumoAlBatch } from "./produccion.js";
 import {
   collection, doc, addDoc, updateDoc, getDocs,
   onSnapshot, query, orderBy, limit, serverTimestamp, writeBatch, increment
@@ -170,9 +171,16 @@ document.getElementById("btn-confirmar-entrada").addEventListener("click",async(
   if(!prod||cantidad<=0){mostrarMsg(msgEl,"error","Completá los campos.");return;}
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
-    await addDoc(collection(db,"movimientos"),{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo,cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"externo",destino:"acopio"});
-    await updateDoc(doc(db,"productos",prodId),{stock_deposito:increment(cantidad)});
-    mostrarMsg(msgEl,"ok",`✓ ${cantidad} ${prod.unidad_medida} ingresados al acopio.`);
+    // Ingreso Producción + receta de producción → descuenta insumos en el mismo batch.
+    const consumos=(tipo==="INGRESO_PRODUCCION")?calcularConsumoProduccion(prod,cantidad):[];
+    const batch=writeBatch(db);
+    const movRef=doc(collection(db,"movimientos"));
+    batch.set(movRef,{fecha_hora:serverTimestamp(),id_usuario:auth.currentUser?.uid||null,nombre_usuario:usuarioActual.nombre,id_producto:prodId,nombre_producto:prod.nombre,tipo,cantidad,unidad:prod.unidad_medida,motivo:obs?`${motivo} — ${obs}`:motivo,origen:"externo",destino:"acopio",...(consumos.length?{consumo_produccion:consumos}:{})});
+    batch.update(doc(db,"productos",prodId),{stock_deposito:increment(cantidad)});
+    agregarConsumoAlBatch(batch,{plato:prod,consumos,produccionId:movRef.id,usuarioNombre:usuarioActual.nombre,existe:(pid)=>productos.some(p=>p.id===pid)});
+    await batch.commit();
+    const extra=consumos.length?` · ${consumos.length} insumo(s) descontado(s)`:"";
+    mostrarMsg(msgEl,"ok",`✓ ${cantidad} ${prod.unidad_medida} ingresados al acopio${extra}.`);
     document.getElementById("ent-cantidad").value="1"; cargarMovimientos();
   }catch(err){mostrarMsg(msgEl,"error","Error: "+err.message);}
   finally{btn.disabled=false;btn.innerHTML="Registrar entrada";}

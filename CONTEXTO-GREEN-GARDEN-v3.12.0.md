@@ -1,4 +1,4 @@
-# CONTEXTO COMPLETO — Green Garden Inventario (v3.11.0)
+# CONTEXTO COMPLETO — Green Garden Inventario (v3.12.0)
 
 > Pegá este documento al iniciar una conversación nueva. Resume TODO el proyecto: qué es, cómo está hecho técnicamente, la lógica de negocio, la UX/UI, el estado actual y lo que queda pendiente. Está escrito para que una instancia nueva de Claude entienda el proyecto sin necesidad de la conversación anterior.
 
@@ -210,9 +210,22 @@ Las bebidas se cargan por unidad entera (ej. una botella de gin), pero las recet
 - En el editor de receta, al elegir un ingrediente con rendimiento, aparece un **selector de unidad** (ml / unidad base, default ml) y un **cartel de conversión en vivo** ("= 0.0857 Unidades").
 - Al guardar el ingrediente, se almacena `cantidad` en **unidad base** (60/700 = 0.0857) y se guardan `cant_in`/`unidad_in` (60, "ml") para mostrar/editar.
 - **La lógica de descuento NO cambió**: el importador sigue descontando en unidad base. El ml es solo comodidad de carga. La preview del importador muestra el consumo en la unidad ingresada (ej. "300 ml").
-- ⚠️ Limitación conocida: si se cambia el `rendimiento` de un producto, hay que reabrir y volver a guardar las recetas que lo usan para que recalculen.
+- Al **cambiar el `rendimiento`/subunidad/unidad base** de un producto, las recetas (de barra y de producción) que lo usan en subunidad **se recalculan solas** (`recalcularRecetasPorRendimiento`).
 
 Editor de receta también tiene: **buscador escribiendo** (input "🔍 Buscar producto…" que filtra el desplegable de ingredientes en vivo, autoseleccionando el primer match), y soporte de **variantes por tamaño** (ej. Gin Tonic Nacional/Importado, cada una con sus ingredientes).
+
+### 8.1 Dos modelos de receta (barra vs cocina)
+
+Hay **dos** mecanismos de receta, que se diferencian en CUÁNDO se consumen los insumos:
+
+- **Receta de barra** (tipo `Receta`, ya existente): no tiene stock propio; consume sus ingredientes **al VENDER** (por importación de Excel), del despacho del sector donde se arma. Ej: Gin Tonic.
+- **Receta de producción** (v3.12, campo `receta_produccion` en un producto de Despacho/Materia prima): el producto SÍ tiene stock; consume sus insumos **al PRODUCIR** (Ingreso Producción), del **acopio** de cada insumo. Ej: Ñoqui de papa (se elabora una tanda, consume harina/papa, quedan porciones en stock que después se venden como cualquier despacho). Lógica compartida en `js/produccion.js`, disponible en Gerente, Encargado y Cargador de Entradas.
+  - Los insumos se cargan **por porción** y se multiplican por la cantidad producida. Un insumo puede ser materia prima **u otro elaborado** (se consume su stock; sin recursión).
+  - Cada Ingreso Producción deja el movimiento del plato (con `consumo_produccion` = resumen) **+ un RETIRO por insumo** (`origen: acopio`, `destino: produccion`, enlazado por `produccion_id`).
+  - **Editar/eliminar** un Ingreso Producción (caso "se cargó mal") revierte también los insumos y borra sus movimientos enlazados. Si en cambio **la tanda se perdió/dañó**, NO se borra la producción: se da de baja el plato terminado con una **Merma** (retiro), y los insumos quedan gastados.
+  - Insumo insuficiente al producir → queda **negativo** (señal de faltante), como el resto de la app.
+
+> Un plato con salsa a elección (ñoqui + salsa X) se modela combinando ambos: la salsa y el ñoqui son **recetas de producción** (stockeables), y el plato vendible es una **receta de barra por variantes** donde el Tamaño del Excel = la salsa.
 
 ---
 
@@ -284,7 +297,12 @@ Lleva, por cada producto de despacho, hasta qué fecha están cargadas sus venta
 
 ---
 
-## 14. ESTADO ACTUAL (v3.11.0) — qué se hizo recientemente
+## 14. ESTADO ACTUAL (v3.12.0) — qué se hizo recientemente
+
+**v3.12.0 (feature grande — recetas de producción / cocina):**
+- **Receta de producción** (`js/produccion.js` + editor en el modal de producto): un producto de Despacho/Materia prima puede tener una lista de insumos **por porción**. Al hacer su **Ingreso Producción**, se descuentan del **acopio** de cada insumo (insumo×porciones), en el mismo batch atómico, dejando un RETIRO por insumo (`destino: produccion`, enlazado por `produccion_id`) y un resumen `consumo_produccion` en el movimiento del plato. Disponible en Gerente, Encargado y Cargador de Entradas.
+- **Editar/eliminar** un Ingreso Producción revierte también los insumos y borra sus movimientos enlazados (caso "se cargó mal"). La tanda perdida se maneja aparte con una Merma del plato terminado.
+- Insumo insuficiente → negativo (no bloquea). El recálculo por rendimiento también alcanza a las recetas de producción. Ver sección 8.1.
 
 **v3.11.0 (features):**
 - **Editar/eliminar entradas (INGRESO)** — solo Gerente. Modal `modal-editar-entrada` con reverse+apply sobre el acopio (atómico, `increment`). Antes, para corregir una entrada mal cargada había que hacer un ajuste de stock aparte.
@@ -339,12 +357,12 @@ Lleva, por cada producto de despacho, hasta qué fecha están cargadas sus venta
 
 ---
 
-## 16. TESTS Y SIMULADOR DE VISTAS (v3.11.0)
+## 16. TESTS Y SIMULADOR DE VISTAS (v3.12.0)
 
 Hay una suite de tests que corre **sin navegador ni Firebase real** con `npm test` (unit + e2e). Sirve como red de seguridad para cambios futuros.
 
 ```bash
-npm test          # 71 tests (9 unit + 62 e2e)
+npm test          # 76 tests (9 unit + 67 e2e)
 npm run test:unit # lógica de fechas del corte de ventas
 npm run test:e2e  # simulador de las 5 vistas
 ```
@@ -367,4 +385,4 @@ Cubre las 5 vistas y toda la lógica de stock: entradas, retiros/transferencias,
 
 ---
 
-*Fin del contexto. La app está en v3.11.0, operativa y deployada. Para continuar: trabajar sobre el repo, correr `npm test` ante cualquier cambio de stock, y seguir las convenciones de la sección 13.*
+*Fin del contexto. La app está en v3.12.0, operativa y deployada. Para continuar: trabajar sobre el repo, correr `npm test` ante cualquier cambio de stock, y seguir las convenciones de la sección 13.*

@@ -300,6 +300,21 @@
         <div id="receta-editor"></div>
         <div style="font-size:0.72rem;color:var(--texto-3);margin-top:6px;">La cantidad va en la unidad de cada materia prima (ej. barril en Litros → 0.5 por pinta).</div>
       </div>
+      <div id="grupo-receta-produccion" style="display:none;">
+        <div class="form-group">
+          <label class="form-label">Receta de producción <span style="color:var(--texto-3);font-weight:400;">(opcional)</span></label>
+          <div style="font-size:0.74rem;color:var(--texto-3);margin-bottom:8px;">Insumos que se consumen del acopio al hacer <strong>Ingreso Producción</strong> de este producto. Se cargan <strong>por porción</strong> y la app multiplica por la cantidad producida.</div>
+          <div id="prodrec-lista" class="bloque-ings" style="background:var(--bg-primary);border:1px solid var(--borde);border-radius:8px;padding:8px 10px;margin-bottom:8px;"></div>
+          <input type="search" class="form-control prodrec-buscar" id="prodrec-buscar" placeholder="🔍 Buscar insumo…" style="font-size:0.85rem;margin-bottom:6px;" />
+          <select class="form-control" id="prodrec-mat" style="font-size:0.9rem;margin-bottom:8px;"></select>
+          <div style="display:flex;gap:8px;margin-bottom:6px;">
+            <input class="form-control" id="prodrec-cant" type="number" inputmode="decimal" placeholder="Cantidad por porción" min="0" step="any" style="font-size:1rem;flex:1;min-width:0;text-align:right;font-weight:600;" />
+            <select class="form-control" id="prodrec-unidad" style="font-size:0.9rem;width:110px;flex-shrink:0;"><option value="">—</option></select>
+          </div>
+          <div id="prodrec-hint" style="font-size:0.74rem;color:var(--verde,#2d6a4f);font-weight:600;margin-bottom:8px;min-height:1em;"></div>
+          <button type="button" class="btn btn-secondary" id="prodrec-add" style="width:100%;padding:11px;">＋ Agregar insumo</button>
+        </div>
+      </div>
       <div class="form-group"><label class="form-label">Stock inicial en acopio</label><input class="form-control" type="number" id="prod-stock" placeholder="0" min="0" step="0.1" /></div>
       <div class="form-group"><label class="form-label">Stock mínimo <span style="color:var(--texto-3);font-weight:400;">(opcional)</span></label><input class="form-control" type="number" id="prod-stock-min" placeholder="Sin mínimo" min="0" step="0.1" /></div>
       <div id="msg-producto" class="msg"></div>
