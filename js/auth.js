@@ -3,15 +3,20 @@
 // Green Garden Inventario
 // ============================================================
 
-import { auth, db } from "./firebase-config.js";
+import { auth, db, EMAIL_DUENO } from "./firebase-config.js";
 import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  doc, getDoc
+  doc, getDoc, setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ¿El email es el del dueño? (comparación robusta, sin mayúsculas/espacios)
+function esEmailDueno(email) {
+  return !!email && email.trim().toLowerCase() === EMAIL_DUENO.trim().toLowerCase();
+}
 
 // ── Roles válidos y sus rutas ────────────────────────────────
 const RUTA_POR_ROL = {
@@ -33,7 +38,16 @@ export async function obtenerDatosUsuario(uid) {
 // ── Login ────────────────────────────────────────────────────
 export async function login(email, password) {
   const cred  = await signInWithEmailAndPassword(auth, email, password);
-  const datos = await obtenerDatosUsuario(cred.user.uid);
+  let   datos = await obtenerDatosUsuario(cred.user.uid);
+  // Bootstrap del dueño: la primera vez que entra (o si perdió su perfil),
+  // se crea a sí mismo como Gerente activo, sin tocar la consola de Firebase.
+  // Las reglas de Firestore solo permiten esto para el email del dueño.
+  if (!datos && esEmailDueno(cred.user.email)) {
+    await setDoc(doc(db, "usuarios", cred.user.uid), {
+      nombre: "Gerente", email: cred.user.email, rol: "Gerente", activo: true
+    });
+    datos = { uid: cred.user.uid, nombre: "Gerente", email: cred.user.email, rol: "Gerente", activo: true };
+  }
   if (!datos)        throw new Error("Usuario no encontrado en el sistema.");
   if (!datos.activo) throw new Error("Tu cuenta está desactivada. Consultá al administrador.");
   const ruta = RUTA_POR_ROL[datos.rol];
