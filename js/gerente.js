@@ -1774,10 +1774,9 @@ document.getElementById("btn-nuevo-usuario").addEventListener("click", () => {
   document.getElementById("usr-nombre").value   = "";
   document.getElementById("usr-email").value    = "";
   document.getElementById("usr-password").value = "";
-  document.getElementById("usr-rol").value      = "Cargador Salidas";
   document.getElementById("grupo-email").style.display    = "";
   document.getElementById("grupo-password").style.display = "";
-  document.getElementById("grupo-rol").style.display      = "";
+  document.getElementById("grupo-rol").style.display      = "none";
   document.getElementById("msg-usuario").classList.remove("show");
   abrirModal("modal-usuario");
 });
@@ -1813,15 +1812,11 @@ document.getElementById("btn-guardar-usuario").addEventListener("click", async (
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
     if (modo === "crear") {
-      // Segunda instancia de Firebase (authSec): crea la cuenta y su perfil
-      // SIN desloguear al Gerente. El UID se toma de cred.user.uid: nunca hay
-      // que copiarlo a mano desde la consola de Firebase.
-      const rolNuevo = rol || "Cargador Salidas";
       const cred = await createUserWithEmailAndPassword(authSec, email, password);
-      await setDoc(doc(db,"usuarios",cred.user.uid), { nombre, email, rol: rolNuevo, activo: true });
+      await setDoc(doc(db,"usuarios",cred.user.uid), { nombre, email, rol: "Cargador Salidas", activo: true });
       await signOutSec(authSec);
-      mostrarMsg(msgEl,"ok",`Usuario creado como ${rolNuevo}.`);
-      setTimeout(() => cerrarModal("modal-usuario"), 1500);
+      mostrarMsg(msgEl,"ok","Usuario creado como Cargador Salidas. Editalo para cambiar el rol.");
+      setTimeout(() => cerrarModal("modal-usuario"), 2000);
     } else {
       await updateDoc(doc(db,"usuarios",id), { nombre, rol });
       mostrarMsg(msgEl,"ok","Usuario actualizado.");

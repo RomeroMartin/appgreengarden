@@ -5,14 +5,9 @@ rules_version = '2';
 // Antes: cualquier usuario logueado podía escribir todo (incluido
 // auto-ascenderse a Gerente). Ahora cada rol solo hace lo suyo.
 //
-// ✅ BOOTSTRAP SIN CONSOLA: el email del DUEÑO está anclado abajo
-//    (EMAIL_DUENO). Ese único email —y solo ese— puede crearse/
-//    restaurarse a sí mismo como Gerente activo la primera vez que
-//    entra a la app (o para recuperarse). Todos los demás perfiles
-//    solo los crea un Gerente ya existente, desde la app. Nadie puede
-//    auto-crearse ni auto-ascenderse por consola.
-//    Si cambiás el email del dueño, actualizalo también en
-//    js/firebase-config.js (EMAIL_DUENO).
+// ⚠️ BOOTSTRAP: el PRIMER Gerente hay que crearlo/marcarlo a mano
+//    en la consola de Firestore (usuarios/{uid} con rol:"Gerente",
+//    activo:true). Desde ahí, el Gerente crea al resto desde la app.
 // ============================================================
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -32,22 +27,6 @@ service cloud.firestore {
     function esGerente()     { return tieneRol('Gerente'); }
     function gerenteOAdmin() { return esGerente() || tieneRol('Administrador'); }
 
-    // ── DUEÑO (ancla de bootstrap) ───────────────────────────────
-    // El único email que puede crearse/restaurarse a sí mismo como
-    // Gerente activo, sin depender de que exista otro Gerente ni de la
-    // consola de Firebase. No habilita nada más: solo su propio perfil.
-    function esDueno() {
-      return request.auth != null
-        && request.auth.token.email != null
-        && request.auth.token.email.lower() == 'martingreengaren@gmail.com';
-    }
-    function bootstrapDueno(userId) {
-      return esDueno()
-        && userId == request.auth.uid
-        && request.resource.data.rol == 'Gerente'
-        && request.resource.data.activo == true;
-    }
-
     // ¿La escritura sobre productos toca SOLO estas claves? (control de stock)
     function soloAfecta(claves) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(claves);
@@ -58,18 +37,13 @@ service cloud.firestore {
     // lee/administra a todos. NADIE puede editarse el rol a sí mismo.
     match /usuarios/{userId} {
       allow read:   if request.auth != null && (request.auth.uid == userId || esGerente());
-      // Crea perfiles un Gerente ya existente; o el DUEÑO su propio perfil
-      // (bootstrap inicial), nunca alguien más para sí mismo por consola.
-      allow create: if esGerente() || bootstrapDueno(userId);
+      allow create: if esGerente();
       // El Gerente administra a todos, pero NO puede cambiarse a sí mismo el rol
       // ni desactivarse, ni borrarse (evita quedar sin acceso por accidente).
-      // Excepción: el DUEÑO siempre puede restaurar su propio perfil a Gerente
-      // activo (auto-recuperación sin consola).
-      allow update: if (esGerente()
-          && !(userId == request.auth.uid
-               && (request.resource.data.rol != resource.data.rol
-                   || request.resource.data.activo != resource.data.activo)))
-        || bootstrapDueno(userId);
+      allow update: if esGerente()
+        && !(userId == request.auth.uid
+             && (request.resource.data.rol != resource.data.rol
+                 || request.resource.data.activo != resource.data.activo));
       allow delete: if esGerente() && userId != request.auth.uid;
     }
 
