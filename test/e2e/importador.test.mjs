@@ -106,6 +106,42 @@ test("sin fila de 'periodo' descuenta igual pero NO fija ventas_hasta", async ()
   assert.deepEqual(p.ventas_hasta ?? null, vhAntes ?? null, "ventas_hasta no cambió");
 });
 
+// ── PARSER JERÁRQUICO: ignora rubros y no suma re-listas ──────
+test("ignora la fila de RUBRO (código corto con total) — no la carga como venta", async () => {
+  const antes = store.get("productos", "p-agua").stock_despacho.Barra;
+  // Fila de rubro [10, "BEBIDAS", 999] no debe tocar nada; solo el producto 102.
+  await uploadExcel("import-file", excel([
+    [10, "BEBIDAS", 999, 0, ""],   // RUBRO (código < 100 + total) → se ignora
+    [102, "Agua", 4, 0, ""],       // producto real
+  ]));
+  assert.match(text("import-count-ignorados"), /0/, "el rubro no aparece como ignorado");
+  await click("btn-import-confirmar");
+  assert.equal(store.get("productos", "p-agua").stock_despacho.Barra, antes - 4, "descontó solo el producto");
+});
+
+test("re-lista del mismo producto bajo otra subcategoría NO se suma (doble conteo del reporte)", async () => {
+  const antes = store.get("productos", "p-agua").stock_despacho.Barra;
+  await uploadExcel("import-file", excel([
+    [10, "BEBIDAS", 8, 0, ""],     // rubro
+    [102, "Agua", 8, 0, ""],       // producto bajo el rubro
+    [40, "PROMOS", "", "", ""],    // SUBCATEGORÍA (código corto, sin cantidad)
+    [102, "Agua", 8, 0, ""],       // MISMA venta re-listada bajo otra subcat → se ignora
+  ]));
+  await click("btn-import-confirmar");
+  assert.equal(store.get("productos", "p-agua").stock_despacho.Barra, antes - 8, "descontó 8, no 16");
+});
+
+test("mismo producto dos veces en la MISMA subcategoría (dos precios) SÍ suma", async () => {
+  const antes = store.get("productos", "p-agua").stock_despacho.Barra;
+  await uploadExcel("import-file", excel([
+    [10, "BEBIDAS", 5, 0, ""],     // rubro
+    [102, "Agua", 3, 0, ""],       // misma subcategoría (bajo el rubro)
+    [102, "Agua", 2, 0, ""],       // consecutiva, misma subcat → suma
+  ]));
+  await click("btn-import-confirmar");
+  assert.equal(store.get("productos", "p-agua").stock_despacho.Barra, antes - 5, "3+2 = 5");
+});
+
 // ── ANULAR CARGA MASIVA ───────────────────────────────────────
 test("cada importación registra un lote anulable", async () => {
   const antesLotes = store.count("lotes_importacion");
