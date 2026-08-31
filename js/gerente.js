@@ -35,7 +35,6 @@ let sectoresDespacho  = [];
 let movimientosCached = [];
 let movIndex          = {};   // id -> movimiento (para corregir motivo)
 let lotesCache        = [];   // lotes de importación (cargas masivas de ventas)
-let legadoCache       = [];   // movimientos de importación viejos (sin lote) — revertibles en bloque
 let usuarioActual     = null;
 let confirmCallback   = null;
 
@@ -1285,120 +1284,13 @@ async function cargarMovRecientes() {
 // el stock descontado, se borran sus movimientos y se restaura la fecha de corte.
 const _ms = (v) => v == null ? null : (v.toDate ? v.toDate().getTime() : (v instanceof Date ? v.getTime() : (isNaN(new Date(v)) ? null : new Date(v).getTime())));
 
-// ¿Es un movimiento creado por una importación de Excel? (venta directa o consumo de receta)
-const esMovImportacion = (m) => m.tipo === "VENTA" && typeof m.motivo === "string" &&
-  (m.motivo.startsWith("Importación Excel") || m.motivo.startsWith("Consumo receta"));
-
-// Trae los movimientos de importación SIN lote (cargados con el sistema anterior a v3.13).
-async function cargarLegadoImport() {
-  const snap = await getDocs(query(collection(db,"movimientos"), where("tipo","==","VENTA")));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => esMovImportacion(m) && !m.lote_id);
-}
-
 async function cargarCargasImportadas() {
   const cont = document.getElementById("lista-cargas");
   if (!cont) return;
-  const [snap, legado] = await Promise.all([
-    getDocs(query(collection(db,"lotes_importacion"), orderBy("fecha_hora","desc"), limit(15))),
-    cargarLegadoImport()
-  ]);
-  lotesCache  = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  legadoCache = agruparSesionesLegadas(legado);   // cada sesión = UNA carga vieja (agrupada por fecha/hora)
-
-  let html = legadoCache.map((s, i) => filaLegado(s, i)).join("");
-  if (lotesCache.length) html += lotesCache.map(filaCarga).join("");
-  if (!html) html = '<div class="empty-state" style="padding:14px 0 18px;"><p style="font-size:0.82rem;">Todavía no importaste ventas desde Excel.</p></div>';
-  cont.innerHTML = html;
-}
-
-// Agrupa los movimientos de importación viejos (sin lote) en "sesiones": una carga
-// masiva crea todos sus movimientos juntos, así que la fecha/hora es lo único que
-// los une. Un salto > 5 min entre movimientos marca el comienzo de OTRA carga. Así
-// se puede revertir SOLO la última sin tocar las cargas anteriores.
-const _tsMs = (m) => m.fecha_hora?.toDate ? m.fecha_hora.toDate().getTime() : (m.fecha_hora instanceof Date ? m.fecha_hora.getTime() : 0);
-function agruparSesionesLegadas(movs) {
-  const GAP = 5 * 60 * 1000;
-  const orden = movs.map(m => ({ m, ms: _tsMs(m) })).sort((a,b) => a.ms - b.ms);
-  const sesiones = [];
-  let cur = null;
-  for (const { m, ms } of orden) {
-    if (!cur || ms - cur.ultimoMs > GAP) { cur = { movs: [], primerMs: ms, ultimoMs: ms }; sesiones.push(cur); }
-    cur.movs.push(m); cur.ultimoMs = ms;
-  }
-  return sesiones.sort((a,b) => b.primerMs - a.primerMs);   // más reciente primero
-}
-
-// Una tarjeta por carga vieja, con su propio botón "Revertir" (solo esa carga).
-function filaLegado(s, idx) {
-  const ts = new Date(s.primerMs || 0);
-  const fecha = s.primerMs ? ts.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—";
-  const hora  = s.primerMs ? ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}) : "";
-  const prods = new Set(s.movs.map(m => m.id_producto)).size;
-  const usuario = s.movs[0]?.nombre_usuario || "—";
-  return `<div class="mov-row" style="border-left:3px solid var(--bajo-txt,#b45309);padding-left:9px;">
-    <div class="mov-header">
-      <span class="mov-producto">${icono("alerta",{size:13})} Carga sin lote (sistema anterior)</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <button class="btn-icono danger" onclick="revertirLegadoUI(${idx})" title="Revertir SOLO esta carga y devolver el stock" style="font-size:0.72rem;font-weight:700;padding:5px 11px;width:auto;border:1px solid var(--critico-txt);border-radius:8px;color:var(--critico-txt);white-space:nowrap;">Revertir</button>
-      </div>
-    </div>
-    <div class="mov-meta">${fecha} ${hora} · ${prods} ${prods===1?"producto":"productos"} · ${s.movs.length} mov. · ${escHtml(usuario)}</div>
-  </div>`;
-}
-
-window.revertirLegadoUI = (idx) => {
-  const s = legadoCache[idx];
-  if (!s) return;
-  const prods = new Set(s.movs.map(m => m.id_producto)).size;
-  const ts = new Date(s.primerMs || 0);
-  const cuando = s.primerMs
-    ? `${ts.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"2-digit"})} ${ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false})}`
-    : "sin fecha";
-  mostrarConfirm(
-    `¿Revertir SOLO esta carga (${cuando})? Se devolverán al stock ${s.movs.length} movimiento(s) de ${prods} producto(s) y se borran esos movimientos. ` +
-    `Las demás cargas NO se tocan. Después vas a poder reimportar el reporte.`,
-    () => revertirSesionLegada(s)
-  );
-};
-
-async function revertirSesionLegada(s) {
-  const cont = document.getElementById("lista-cargas");
-  try {
-    const MAX_OPS = 450;
-    let batch = writeBatch(db);
-    let ops = 0;
-    const flushBatch = async () => { if (ops >= MAX_OPS) { await batch.commit(); batch = writeBatch(db); ops = 0; } };
-    const despachoAfectados = new Set();
-
-    // Devolver el stock de ESTA carga (cada venta descontó de su sector de origen) y borrar sus movimientos.
-    for (const m of s.movs) {
-      const prod = productos.find(p => p.id === m.id_producto);
-      if (prod && m.origen && m.origen !== "acopio") {
-        await flushBatch();
-        batch.update(doc(db,"productos",m.id_producto), { [`stock_despacho.${m.origen}`]: increment(+m.cantidad) });
-        ops++;
-        if (esDespacho(prod)) despachoAfectados.add(prod.id);
-      }
-      await flushBatch();
-      batch.delete(doc(db,"movimientos",m.id));
-      ops++;
-    }
-    // Limpiar la fecha de corte SOLO de los productos de despacho de esta carga
-    // (así al reimportar no salta el aviso de "ventas ya cargadas").
-    for (const pid of despachoAfectados) {
-      await flushBatch();
-      batch.update(doc(db,"productos",pid), { ventas_hasta: null });
-      ops++;
-    }
-    if (ops > 0) await batch.commit();
-
-    cargarCargasImportadas();
-    cargarMovRecientes();
-    if (movimientosCached.length) cargarHistorial();
-    renderStock();
-  } catch (err) {
-    if (cont) cont.innerHTML = `<div class="empty-state"><p style="color:var(--critico-txt);">Error al revertir: ${escHtml(err.message)}</p></div>`;
-  }
+  const snap = await getDocs(query(collection(db,"lotes_importacion"), orderBy("fecha_hora","desc"), limit(15)));
+  lotesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (!lotesCache.length) { cont.innerHTML = '<div class="empty-state" style="padding:14px 0 18px;"><p style="font-size:0.82rem;">Todavía no importaste ventas desde Excel.</p></div>'; return; }
+  cont.innerHTML = lotesCache.map(filaCarga).join("");
 }
 
 function filaCarga(l) {
