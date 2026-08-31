@@ -80,6 +80,16 @@ service cloud.firestore {
       allow delete: if gerenteOAdmin();
     }
 
+    // ── LOTES DE IMPORTACIÓN (cargas masivas de ventas) ──────────
+    // Cada importación de Excel deja un "lote" con lo necesario para revertirla.
+    // Lo crea quien importa (Gerente/Admin), a su propio nombre. El Gerente/Admin
+    // lo lee y lo marca como anulado. No se borra: queda el registro de la carga.
+    match /lotes_importacion/{id} {
+      allow read:   if logueado();
+      allow create: if gerenteOAdmin() && request.resource.data.id_usuario == request.auth.uid;
+      allow update: if gerenteOAdmin();
+    }
+
     // ── Todo lo demás: denegado por defecto ──────────────────────
     match /{document=**} {
       allow read, write: if false;
