@@ -1303,65 +1303,93 @@ async function cargarCargasImportadas() {
     cargarLegadoImport()
   ]);
   lotesCache  = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  legadoCache = legado;
+  legadoCache = agruparSesionesLegadas(legado);   // cada sesión = UNA carga vieja (agrupada por fecha/hora)
 
-  let html = legado.length ? bannerLegado(legado) : "";
+  let html = legadoCache.map((s, i) => filaLegado(s, i)).join("");
   if (lotesCache.length) html += lotesCache.map(filaCarga).join("");
   if (!html) html = '<div class="empty-state" style="padding:14px 0 18px;"><p style="font-size:0.82rem;">Todavía no importaste ventas desde Excel.</p></div>';
   cont.innerHTML = html;
 }
 
-// Banner para revertir en bloque las cargas viejas sin lote.
-function bannerLegado(movs) {
-  const prods = new Set(movs.map(m => m.id_producto));
-  return `<div style="background:var(--bajo-bg);border:1px solid #F0D9B5;border-radius:var(--radio-input);padding:11px 13px;margin:8px 0 12px;">
-    <div style="font-size:0.86rem;font-weight:700;color:var(--bajo-txt);display:flex;align-items:center;gap:6px;">${icono("alerta",{size:15})} Ventas importadas con el sistema anterior</div>
-    <div style="font-size:0.78rem;color:var(--texto-2);margin:5px 0 10px;">${movs.length} movimiento(s) en ${prods.size} producto(s), sin registro de lote (no se pueden anular de a uno). Podés revertirlas TODAS para volver a importar el reporte desde cero.</div>
-    <button class="btn-icono danger" onclick="revertirLegadoUI()" style="font-size:0.74rem;font-weight:700;padding:7px 13px;width:auto;border:1px solid var(--critico-txt);border-radius:8px;color:var(--critico-txt);">Revertir todas las cargas viejas</button>
+// Agrupa los movimientos de importación viejos (sin lote) en "sesiones": una carga
+// masiva crea todos sus movimientos juntos, así que la fecha/hora es lo único que
+// los une. Un salto > 5 min entre movimientos marca el comienzo de OTRA carga. Así
+// se puede revertir SOLO la última sin tocar las cargas anteriores.
+const _tsMs = (m) => m.fecha_hora?.toDate ? m.fecha_hora.toDate().getTime() : (m.fecha_hora instanceof Date ? m.fecha_hora.getTime() : 0);
+function agruparSesionesLegadas(movs) {
+  const GAP = 5 * 60 * 1000;
+  const orden = movs.map(m => ({ m, ms: _tsMs(m) })).sort((a,b) => a.ms - b.ms);
+  const sesiones = [];
+  let cur = null;
+  for (const { m, ms } of orden) {
+    if (!cur || ms - cur.ultimoMs > GAP) { cur = { movs: [], primerMs: ms, ultimoMs: ms }; sesiones.push(cur); }
+    cur.movs.push(m); cur.ultimoMs = ms;
+  }
+  return sesiones.sort((a,b) => b.primerMs - a.primerMs);   // más reciente primero
+}
+
+// Una tarjeta por carga vieja, con su propio botón "Revertir" (solo esa carga).
+function filaLegado(s, idx) {
+  const ts = new Date(s.primerMs || 0);
+  const fecha = s.primerMs ? ts.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—";
+  const hora  = s.primerMs ? ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}) : "";
+  const prods = new Set(s.movs.map(m => m.id_producto)).size;
+  const usuario = s.movs[0]?.nombre_usuario || "—";
+  return `<div class="mov-row" style="border-left:3px solid var(--bajo-txt,#b45309);padding-left:9px;">
+    <div class="mov-header">
+      <span class="mov-producto">${icono("alerta",{size:13})} Carga sin lote (sistema anterior)</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn-icono danger" onclick="revertirLegadoUI(${idx})" title="Revertir SOLO esta carga y devolver el stock" style="font-size:0.72rem;font-weight:700;padding:5px 11px;width:auto;border:1px solid var(--critico-txt);border-radius:8px;color:var(--critico-txt);white-space:nowrap;">Revertir</button>
+      </div>
+    </div>
+    <div class="mov-meta">${fecha} ${hora} · ${prods} ${prods===1?"producto":"productos"} · ${s.movs.length} mov. · ${escHtml(usuario)}</div>
   </div>`;
 }
 
-window.revertirLegadoUI = () => {
-  if (!legadoCache.length) return;
-  const prods = new Set(legadoCache.map(m => m.id_producto));
+window.revertirLegadoUI = (idx) => {
+  const s = legadoCache[idx];
+  if (!s) return;
+  const prods = new Set(s.movs.map(m => m.id_producto)).size;
+  const ts = new Date(s.primerMs || 0);
+  const cuando = s.primerMs
+    ? `${ts.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"2-digit"})} ${ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false})}`
+    : "sin fecha";
   mostrarConfirm(
-    `¿Revertir TODAS las ventas importadas con el sistema anterior? Se devolverán al stock ${legadoCache.length} movimiento(s) de ${prods.size} producto(s), se borran esos movimientos y se limpia la fecha de corte de los productos. ` +
-    `Después vas a poder importar el reporte de nuevo desde cero (y esa carga nueva ya va a quedar anulable).`,
-    () => revertirImportacionLegada()
+    `¿Revertir SOLO esta carga (${cuando})? Se devolverán al stock ${s.movs.length} movimiento(s) de ${prods} producto(s) y se borran esos movimientos. ` +
+    `Las demás cargas NO se tocan. Después vas a poder reimportar el reporte.`,
+    () => revertirSesionLegada(s)
   );
 };
 
-async function revertirImportacionLegada() {
+async function revertirSesionLegada(s) {
   const cont = document.getElementById("lista-cargas");
   try {
-    const movs = legadoCache;
     const MAX_OPS = 450;
     let batch = writeBatch(db);
     let ops = 0;
     const flushBatch = async () => { if (ops >= MAX_OPS) { await batch.commit(); batch = writeBatch(db); ops = 0; } };
+    const despachoAfectados = new Set();
 
-    // 1) Devolver el stock: cada venta importada descontó de su sector de origen → se suma de vuelta.
-    for (const m of movs) {
+    // Devolver el stock de ESTA carga (cada venta descontó de su sector de origen) y borrar sus movimientos.
+    for (const m of s.movs) {
       const prod = productos.find(p => p.id === m.id_producto);
       if (prod && m.origen && m.origen !== "acopio") {
         await flushBatch();
         batch.update(doc(db,"productos",m.id_producto), { [`stock_despacho.${m.origen}`]: increment(+m.cantidad) });
         ops++;
+        if (esDespacho(prod)) despachoAfectados.add(prod.id);
       }
       await flushBatch();
       batch.delete(doc(db,"movimientos",m.id));
       ops++;
     }
-
-    // 2) Limpiar la fecha de corte de TODOS los productos que la tengan (reload desde cero):
-    //    así, al reimportar, no salta el aviso de "ventas ya cargadas".
-    for (const p of productos) {
-      if (p.ventas_hasta == null) continue;
+    // Limpiar la fecha de corte SOLO de los productos de despacho de esta carga
+    // (así al reimportar no salta el aviso de "ventas ya cargadas").
+    for (const pid of despachoAfectados) {
       await flushBatch();
-      batch.update(doc(db,"productos",p.id), { ventas_hasta: null });
+      batch.update(doc(db,"productos",pid), { ventas_hasta: null });
       ops++;
     }
-
     if (ops > 0) await batch.commit();
 
     cargarCargasImportadas();
