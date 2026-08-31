@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Green Garden — Manual de Usuario v3.12</title>
+<title>Green Garden — Manual de Usuario v3.13</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -250,7 +250,7 @@
     <h1>Manual de <em>Usuario</em></h1>
     <p class="sub">Todo lo que necesitás para manejar el stock del restaurante desde el celular o la computadora.</p>
     <div class="meta">
-      <span><strong>Versión 3.12</strong>Agosto 2026</span>
+      <span><strong>Versión 3.13</strong>Agosto 2026</span>
       <span><strong>Martin Romero Studio</strong>Desarrollo</span>
       <span><strong>control-stoks---green-garden.web.app</strong>Acceso</span>
     </div>
@@ -534,19 +534,35 @@
       <p>En <strong>Movimientos → Importar ventas desde Excel</strong>:</p>
       <ol class="pasos">
         <li>Subí el archivo de consumos que genera tu software de gestión.</li>
-        <li>La app busca cada producto por su PLU y muestra una vista previa: cuántos descuenta, cuántos ignora (sin PLU), las cantidades y el período detectado.</li>
+        <li>La app busca cada producto por su PLU y muestra una vista previa: cuántos descuenta, cuántos ignora (sin PLU o PLU que no coincide), las cantidades y el período detectado. <strong>Mirá siempre la vista previa antes de confirmar</strong>: es tu red de seguridad, te muestra exactamente qué se va a descontar.</li>
         <li>Para productos con varios sectores, elegís de cuál descontar. Para recetas con variantes, la app usa la columna <strong>Tamaño</strong> del archivo para saber qué versión vendiste.</li>
         <li>Confirmás y la app descuenta todo de una, registrando cada venta y actualizando la fecha de ventas de cada producto.</li>
       </ol>
+      <div class="nota verde">
+        <span class="et">Entiende la estructura del reporte</span>
+        El reporte del software viene agrupado por <strong>rubros</strong> y subcategorías. La app reconoce esa estructura: ignora las filas de total de cada rubro y no cuenta dos veces un producto que aparece listado en dos grupos. Solo descuenta las <strong>ventas reales</strong> de cada producto.
+      </div>
       <div class="nota rojo">
         <span class="et">Sobre el stock negativo</span>
         Si un producto queda en negativo en el despacho después de importar, es una señal útil: se vendió mercadería que nunca se registró como repuesta al despacho. Revisá si faltó cargar una Reposición.
       </div>
 
-      <h3><span class="n">7.4</span>Usuarios y motivos</h3>
+      <h3><span class="n">7.4</span>Anular una carga de ventas importada</h3>
+      <p>Si te equivocaste de archivo o cargaste un reporte que no era, no hace falta corregir producto por producto. En <strong>Movimientos</strong>, la tarjeta <strong>“Cargas de ventas importadas”</strong> lista cada importación que hiciste, con su fecha, período y resumen.</p>
+      <ol class="pasos">
+        <li>Encontrá la carga que querés deshacer en la lista.</li>
+        <li>Tocá <strong>Anular</strong>: la app <strong>devuelve al stock</strong> todo lo que esa carga había descontado, borra sus movimientos del historial y restaura la fecha de ventas anterior de cada producto.</li>
+        <li>La carga queda marcada como <strong>“Anulada”</strong> (no desaparece: queda el registro de que se hizo). Ya podés volver a importar el reporte corregido.</li>
+      </ol>
+      <div class="nota">
+        <span class="et">Seguro y reversible</span>
+        Anular una carga no “pisa” otras cargas: solo revierte exactamente lo que esa importación descontó. Si otra carga posterior ya avanzó la fecha de ventas de un producto, no se toca.
+      </div>
+
+      <h3><span class="n">7.5</span>Usuarios y motivos</h3>
       <p>En <strong>Usuarios</strong> creás las cuentas del personal (nacen como Cargador Salidas; después editás el rol). En <strong>Config → Motivos de Salida</strong> podés crear motivos propios y decidir si suman al despacho o solo descuentan.</p>
 
-      <h3><span class="n">7.5</span>Historial y exportar a Excel</h3>
+      <h3><span class="n">7.6</span>Historial y exportar a Excel</h3>
       <p>En <strong>Historial</strong> podés filtrar por tipo, producto, usuario y <strong>rango de fechas</strong>. Cuando filtrás por fechas, aparecen <strong>todos</strong> los movimientos de ese período —entradas, salidas, ventas y ajustes—, por más viejos que sean. Tocá <strong>Exportar a Excel</strong> para descargar lo que quede filtrado.</p>
     </section>
 
@@ -594,8 +610,11 @@
       <h3>No puedo agregar ingredientes a una receta</h3>
       <p>Primero elegí un producto en el desplegable “Agregar ingrediente” y después tocá Agregar. Si el desplegable está vacío, todavía no creaste los productos que la componen.</p>
 
-      <h3>Importé el Excel y faltan productos</h3>
-      <p>Esos productos no tienen el código PLU cargado, o no coincide con el del software. Verificá en Productos que el PLU sea exactamente el mismo.</p>
+      <h3>Importé el Excel y un producto no cargó (o cargó de menos)</h3>
+      <p>Casi siempre es el <strong>código PLU</strong>: el producto no lo tiene cargado, o el que tiene en la app no coincide con el del software (por ejemplo, la app tiene 4176 pero el reporte lo trae como 1104). En ese caso el producto aparece en la lista de <strong>“Ignorados”</strong> de la vista previa y no se descuenta. Verificá en <strong>Productos</strong> que el PLU sea exactamente el mismo que el del reporte. Ojo también: si el software no registró ventas de ese producto en el período, simplemente no aparece en el archivo (y está bien que no descuente nada).</p>
+
+      <h3>Cargué mal una importación y quiero deshacerla</h3>
+      <p>Andá a <strong>Movimientos → “Cargas de ventas importadas”</strong>, buscá la carga y tocá <strong>Anular</strong>. Se devuelve todo el stock y se borran sus movimientos, así podés volver a importar el reporte corregido (sección 7.4).</p>
 
       <h3>Un producto quedó en stock negativo</h3>
       <p>Se vendió más de lo que figuraba en el despacho. Revisá si faltó registrar una reposición desde el acopio.</p>

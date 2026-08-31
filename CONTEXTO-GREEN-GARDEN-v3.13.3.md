@@ -1,4 +1,4 @@
-# CONTEXTO COMPLETO — Green Garden Inventario (v3.12.0)
+# CONTEXTO COMPLETO — Green Garden Inventario (v3.13.3)
 
 > Pegá este documento al iniciar una conversación nueva. Resume TODO el proyecto: qué es, cómo está hecho técnicamente, la lógica de negocio, la UX/UI, el estado actual y lo que queda pendiente. Está escrito para que una instancia nueva de Claude entienda el proyecto sin necesidad de la conversación anterior.
 
@@ -89,7 +89,7 @@ green-garden/
 ## 5. MODELO DE DATOS (Firestore)
 
 ### Colecciones
-`productos`, `movimientos`, `usuarios`, `rubros`, `sectores` (sectores de acopio), `sectores_despacho`, `motivos_salida`.
+`productos`, `movimientos`, `usuarios`, `rubros`, `sectores` (sectores de acopio), `sectores_despacho`, `motivos_salida`, `lotes_importacion` (cargas masivas de ventas, anulables — v3.13).
 
 ### Documento `productos`
 ```
@@ -142,7 +142,23 @@ destino,                // "consumo" | nombre de sector de despacho
 // solo en correcciones de motivo:
 corregido: true, motivo_anterior, fecha_correccion,
 // solo en ventas:
-periodo, periodo_desde, periodo_hasta
+periodo, periodo_desde, periodo_hasta,
+// solo en ventas por importación (v3.13):
+lote_id                 // id del lote_importacion que creó el movimiento (para anular la carga)
+```
+
+### Documento `lotes_importacion` (v3.13)
+Cada importación de Excel deja un lote con TODO lo necesario para anularla (revertir la carga completa):
+```
+fecha_hora: Timestamp,
+id_usuario, nombre_usuario,
+fecha_corte, fecha_desde,          // período del reporte (hasta / desde)
+total_productos, total_ingredientes, total_movimientos,
+deltas: [{ id_producto, campo, delta }],   // Δ aplicado a cada campo de stock (al anular se suma el opuesto)
+ventas_hasta_prev: [{ id_producto, anterior }], // corte previo de cada producto (para restaurarlo)
+anulado: boolean,
+// al anular:
+id_usuario_anulo, nombre_usuario_anulo, fecha_anulacion
 ```
 
 ---
@@ -183,7 +199,9 @@ Saca del acopio. El efecto depende del **motivo**:
 Descuenta del **despacho**. Dos vías:
 - **Manual:** valida stock y recorta a 0 (`Math.max(0,...)`).
 - **Importación Excel** (`importador-ventas.js`): matchea por **PLU**, lee el período del reporte, y descuenta con `increment()` **atómico** (agrega los deltas por producto/sector antes de escribir → un solo `increment` por campo, no se pisa con operaciones concurrentes ni se duplica si un PLU aparece en varias filas). **Permite stock negativo** a propósito (señal de "se vendió algo que no se repuso al despacho"). Para **recetas**, descuenta los ingredientes (en unidad base) del sector de la receta; para **recetas con variantes**, matchea la variante por la columna **"Tamanio"** del Excel (normalizada: trim + uppercase).
+  - **Parser jerárquico (v3.13):** el reporte del POS tiene 3 niveles — **RUBRO** (código corto <100 + total) → **SUBCATEGORÍA** (código corto, sin cantidad) → **PRODUCTO** (PLU ≥ 100 + cantidad). El parser (`parsearFilas`) ahora **ignora los encabezados** (código < 100; ningún PLU real tiene menos de 3 dígitos) y **no suma las re-listas**: un producto que el reporte muestra bajo una segunda subcategoría (mismas ventas en dos agrupaciones) se cuenta **una vez por subcategoría**; dos filas del mismo PLU+tamaño en la MISMA subcategoría (dos precios) sí suman. Regla validada contra los totales de rubro del reporte real (18/18). Antes, el parser viejo tragaba las filas de rubro como productos y sumaba las re-listas → inflaba el descuento (ej. postres cargaban de más). **Nota:** los productos cuyo PLU en la app no coincide con el del POS caen en "Ignorados" y no descuentan (revisar esa lista al importar).
   - **Guarda anti-doble-importación (v3.9):** antes de descontar, detecta **solapamiento** con lo ya cargado usando el `ventas_hasta` por producto y el período **desde/hasta** del reporte. Si el archivo (o un período que pisa lo ya cargado) ya se importó, **pide confirmación explícita** antes de volver a descontar. Evita el faltante por reimportar el mismo Excel. Limitación: un período nuevo pero parcialmente solapado se avisa, pero si se confirma sigue descontando el tramo repetido (haría falta ventas por día, que el reporte no trae).
+  - **Anular carga masiva (v3.13):** cada importación deja un **`lotes_importacion`** (ver sección 5) y marca sus movimientos con `lote_id`. En Gerente → Movimientos, la tarjeta **"Cargas de ventas importadas"** lista los lotes recientes con un botón **Anular** por carga: devuelve el stock descontado (`increment` opuesto de los `deltas` guardados), borra los movimientos del lote y **restaura `ventas_hasta`** solo si esa carga fue la última en fijarlo (si una posterior lo avanzó, no lo pisa). El lote queda `anulado: true` (no se borra: queda el registro). Después se puede volver a importar el reporte corregido. *(La reversión de importaciones viejas sin lote —anteriores a v3.13— existió transitoriamente en v3.13.1/.2 y se quitó en v3.13.3 una vez migradas.)*
 
 ### 7.4 Ajuste de inventario (solo Gerente y Admin)
 Aplica la **DIFERENCIA** entre lo contado y lo mostrado con `increment()` (v3.9; antes escribía el valor absoluto). Así el ajuste **compone** con ventas/reposiciones/importaciones concurrentes en vez de pisarlas: si veo 8, cuento 10 (Δ +2) y mientras tanto se vendió 1, el resultado final es 8−1+2 = 9 (correcto), no 10 (que perdería la venta). El resto del sistema ya usaba `increment`; el ajuste era el único que escribía absoluto y por eso era la causa probable de las inconsistencias de stock. Dos formas:
@@ -280,7 +298,7 @@ Lleva, por cada producto de despacho, hasta qué fecha están cargadas sus venta
 
 ## 12. VERSIONADO
 
-- Fuente **única**: `js/version.js` → `export const APP_VERSION = "3.9.0"` + inyecta la pastillita en cualquier `.app-version` (y la crea si no existe). Está incluido con `<script type="module" src=".../version.js">` en las 5 vistas y en `index.html`.
+- Fuente **única**: `js/version.js` → `export const APP_VERSION = "3.13.3"` + inyecta la pastillita en cualquier `.app-version` (y la crea si no existe). Está incluido con `<script type="module" src=".../version.js">` en las 5 vistas y en `index.html`.
 - Ya **no** hay IIFEs con la versión hardcodeada en cada panel (se removieron): para subir de versión alcanza con cambiar `APP_VERSION` en `js/version.js`. Asegurarse de deployar ese archivo (ver quirk de deploy).
 
 ---
@@ -297,7 +315,13 @@ Lleva, por cada producto de despacho, hasta qué fecha están cargadas sus venta
 
 ---
 
-## 14. ESTADO ACTUAL (v3.12.0) — qué se hizo recientemente
+## 14. ESTADO ACTUAL (v3.13.3) — qué se hizo recientemente
+
+**v3.13.x (anular cargas + importador robusto):**
+- **Anular carga masiva de ventas:** cada importación deja un `lotes_importacion` con lo necesario para revertirla; Gerente → Movimientos → tarjeta "Cargas de ventas importadas" con botón **Anular** por carga (devuelve stock, borra movimientos, restaura corte). Ver 7.3 y modelo de datos en 5. Reglas de Firestore nuevas para `lotes_importacion` (crea/lee/anula Gerente/Admin).
+- **Parser de importación jerárquico:** ignora las filas de RUBRO/SUBCATEGORÍA (código < 100) y no suma las re-listas de un mismo producto bajo dos agrupaciones. Arreglo del bug que inflaba el descuento de algunos ítems (postres re-listados). Validado 18/18 contra los totales de rubro del reporte real. Ver 7.3.
+- **Diagnóstico típico:** un producto que "no cargó" suele ser **PLU mal en la app** (no coincide con el del POS → cae en Ignorados) o **producto sin ventas en el reporte** (el POS solo lista lo que se vendió). No es bug del importador.
+- **3.13.1/.2 → .3:** hubo una función transitoria para revertir importaciones viejas sin lote (agrupadas por fecha/hora); se removió en **3.13.3** una vez migrado, dejando solo el sistema de lotes hacia adelante.
 
 **v3.12.0 (feature grande — recetas de producción / cocina):**
 - **Receta de producción** (`js/produccion.js` + editor en el modal de producto): un producto de Despacho/Materia prima puede tener una lista de insumos **por porción**. Al hacer su **Ingreso Producción**, se descuentan del **acopio** de cada insumo (insumo×porciones), en el mismo batch atómico, dejando un RETIRO por insumo (`destino: produccion`, enlazado por `produccion_id`) y un resumen `consumo_produccion` en el movimiento del plato. Disponible en Gerente, Encargado y Cargador de Entradas.
@@ -357,19 +381,19 @@ Lleva, por cada producto de despacho, hasta qué fecha están cargadas sus venta
 
 ---
 
-## 16. TESTS Y SIMULADOR DE VISTAS (v3.12.0)
+## 16. TESTS Y SIMULADOR DE VISTAS (v3.13.3)
 
 Hay una suite de tests que corre **sin navegador ni Firebase real** con `npm test` (unit + e2e). Sirve como red de seguridad para cambios futuros.
 
 ```bash
-npm test          # 76 tests (9 unit + 67 e2e)
+npm test          # 81 tests (9 unit + 72 e2e)
 npm run test:unit # lógica de fechas del corte de ventas
 npm run test:e2e  # simulador de las 5 vistas
 ```
 
 **Simulador E2E** (`test/e2e/*.test.mjs` + `test/harness/`): ejecuta el **código real** de cada vista (`js/<vista>.js` + `vistas/<vista>.html`) sobre **jsdom**, contra un **Firestore falso en memoria** (`test/harness/store.mjs`) con semántica real de `increment()`, field-paths, `serverTimestamp`, `writeBatch` y `onSnapshot` de tiempo real. Un **loader de Node** (`test/harness/hooks.mjs` + `register.mjs`) intercepta las URLs del SDK de Firebase y de SheetJS y las apunta a mocks. `test/harness/env.mjs` monta la vista, siembra un catálogo, simula el login y expone helpers (`click`, `setSelect`, `setValue`, `uploadExcel`, …).
 
-Cubre las 5 vistas y toda la lógica de stock: entradas, retiros/transferencias, ventas, ajuste rápido, conteo físico (incluyendo que no pierde movimientos concurrentes), importación con todos sus casos borde (PLU inexistente, multi-sector, dedup, recetas por variantes, guarda anti-doble), editar/eliminar movimientos, CRUD de productos y de configuración (rubros/sectores/motivos/usuarios) y validaciones.
+Cubre las 5 vistas y toda la lógica de stock: entradas, retiros/transferencias, ventas, ajuste rápido, conteo físico (incluyendo que no pierde movimientos concurrentes), importación con todos sus casos borde (PLU inexistente, multi-sector, dedup, recetas por variantes, guarda anti-doble, **parser jerárquico: ignorar rubros y no sumar re-listas**, **registro y anulación de lote**), editar/eliminar movimientos, CRUD de productos y de configuración (rubros/sectores/motivos/usuarios) y validaciones.
 
 - **`jsdom`** es `devDependency` (solo para tests). No se publica: `firebase.json` ignora `test/` y `node_modules/`.
 - El e2e corre en serie (`--test-concurrency=1`) para que las ventanas async sean deterministas.
@@ -385,4 +409,4 @@ Cubre las 5 vistas y toda la lógica de stock: entradas, retiros/transferencias,
 
 ---
 
-*Fin del contexto. La app está en v3.12.0, operativa y deployada. Para continuar: trabajar sobre el repo, correr `npm test` ante cualquier cambio de stock, y seguir las convenciones de la sección 13.*
+*Fin del contexto. La app está en v3.13.3, operativa y deployada. Para continuar: trabajar sobre el repo, correr `npm test` ante cualquier cambio de stock, y seguir las convenciones de la sección 13.*
