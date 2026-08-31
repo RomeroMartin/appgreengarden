@@ -383,6 +383,7 @@ async function confirmarImportacion() {
     // varias filas del mismo Excel.
     const stockDeltas = new Map();  // prodId -> Map(`stock_despacho.${sector}` -> deltaTotal)
     const ventasHasta = new Map();  // prodId -> Date (corte a fijar)
+    const ventasHastaPrev = new Map(); // prodId -> valor ANTERIOR de ventas_hasta (para poder anular)
     const movs        = [];         // movimientos a crear (uno por línea, para el historial)
     let ventasProcesadas = 0;
     let ingredientesDescontados = 0;
@@ -395,7 +396,14 @@ async function confirmarImportacion() {
 
     for (const f of aDescontar) {
       const avanza = _fechaCorte && debeAvanzar(f.prod.ventas_hasta, _fechaCorte);
-      if (avanza) { ventasHasta.set(f.prod.id, _fechaCorte); f.prod.ventas_hasta = _fechaCorte; }
+      if (avanza) {
+        // Guardamos el valor previo UNA sola vez (el real, antes de esta carga):
+        // si el mismo producto aparece en varias filas, las siguientes verían el
+        // corte recién puesto y guardarían mal el "anterior".
+        if (!ventasHastaPrev.has(f.prod.id)) ventasHastaPrev.set(f.prod.id, f.prod.ventas_hasta ?? null);
+        ventasHasta.set(f.prod.id, _fechaCorte);
+        f.prod.ventas_hasta = _fechaCorte;
+      }
 
       if (f.esReceta) {
         const sector = f.sectorReceta;
@@ -457,14 +465,46 @@ async function confirmarImportacion() {
       prodUpdates.push({ id: prodId, data });
     }
 
+    // ── Registrar el LOTE de importación (para poder ANULARLO después) ──
+    // Guardamos todo lo necesario para revertir la carga completa sin adivinar:
+    //   • deltas: cada campo de stock tocado con su Δ (al anular se suma el opuesto).
+    //   • ventas_hasta_prev: la fecha de corte que tenía cada producto ANTES de esta
+    //     carga (para restaurarla al anular).
+    // Además, cada movimiento queda marcado con lote_id → al anular se borran todos.
+    const loteRef = doc(collection(db, "lotes_importacion"));
+    const loteId  = loteRef.id;
+    movs.forEach(m => { m.lote_id = loteId; });
+    const deltasLote = [];
+    for (const [prodId, campos] of stockDeltas) {
+      for (const [campo, delta] of campos) deltasLote.push({ id_producto: prodId, campo, delta: +delta.toFixed(4) });
+    }
+    const ventasHastaPrevArr = [];
+    for (const prodId of ventasHasta.keys()) {
+      ventasHastaPrevArr.push({ id_producto: prodId, anterior: ventasHastaPrev.get(prodId) ?? null });
+    }
+    const loteData = {
+      fecha_hora: serverTimestamp(),
+      id_usuario: auth.currentUser?.uid || null,
+      nombre_usuario: _usuarioActual.nombre,
+      fecha_corte: _fechaCorte || null,
+      fecha_desde: _fechaDesde || null,
+      total_productos: ventasProcesadas,
+      total_ingredientes: ingredientesDescontados,
+      total_movimientos: movs.length,
+      deltas: deltasLote,
+      ventas_hasta_prev: ventasHastaPrevArr,
+      anulado: false
+    };
+
     // ── Paso C: commitear en batches (Firestore: máx 500 ops por batch).
-    // Cada update de producto = 1 op; cada movimiento = 1 op.
+    // Cada update de producto = 1 op; cada movimiento = 1 op; el lote = 1 op.
     const MAX_OPS = 450;
     let batch = writeBatch(db);
     let ops = 0;
     const commitSiHaceFalta = async () => {
       if (ops >= MAX_OPS) { await batch.commit(); batch = writeBatch(db); ops = 0; }
     };
+    batch.set(loteRef, loteData); ops++;   // el lote va primero, en el primer batch
     for (const u of prodUpdates) {
       await commitSiHaceFalta();
       batch.update(doc(db, "productos", u.id), u.data);

@@ -7,7 +7,7 @@
 import { auth, db, firebaseConfig } from "./firebase-config.js";
 import { protegerRuta, logout } from "./auth.js";
 import { initImportador, abrirImportador, actualizarProductosImportador } from "./importador-ventas.js";
-import { renderResumen, badgeProducto, calcularResumen, debeAvanzar } from "./corte-ventas.js";
+import { renderResumen, badgeProducto, calcularResumen, debeAvanzar, formatearFecha } from "./corte-ventas.js";
 import { initConteo, abrirConteo, setProductosConteo } from "./conteo-fisico.js";
 import { calcularConsumoProduccion, agregarConsumoAlBatch } from "./produccion.js";
 import {
@@ -34,6 +34,7 @@ let sectores          = [];
 let sectoresDespacho  = [];
 let movimientosCached = [];
 let movIndex          = {};   // id -> movimiento (para corregir motivo)
+let lotesCache        = [];   // lotes de importación (cargas masivas de ventas)
 let usuarioActual     = null;
 let confirmCallback   = null;
 
@@ -78,6 +79,7 @@ function iniciar() {
   escucharUsuarios();
   cargarHistorial();
   cargarMovRecientes();
+  cargarCargasImportadas();
 }
 
 // ── RUBROS ────────────────────────────────────────────────────
@@ -223,7 +225,7 @@ function escucharProductos() {
     renderStock(); renderProductos(); renderAlertas();
     actualizarProductosImportador(productos);
   });
-  initImportador({ productos, usuarioActual, onTerminado: () => { cargarMovRecientes(); renderResumen("indicador-corte", productos); renderStock(); } });
+  initImportador({ productos, usuarioActual, onTerminado: () => { cargarMovRecientes(); cargarCargasImportadas(); renderResumen("indicador-corte", productos); renderStock(); } });
   initConteo({ usuarioActual, onAplicado: () => { cargarMovRecientes(); } });
 }
 
@@ -1274,6 +1276,116 @@ async function cargarMovRecientes() {
   const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   lista.forEach(m => { movIndex[m.id] = m; });
   cont.innerHTML = lista.map(filaMovimiento).join("");
+}
+
+// ── CARGAS DE VENTAS IMPORTADAS (lotes) — listar y ANULAR ─────
+// Cada importación de Excel deja un "lote" con lo necesario para revertirla por
+// completo. Acá se listan las cargas recientes y se puede anular una: se devuelve
+// el stock descontado, se borran sus movimientos y se restaura la fecha de corte.
+const _ms = (v) => v == null ? null : (v.toDate ? v.toDate().getTime() : (v instanceof Date ? v.getTime() : (isNaN(new Date(v)) ? null : new Date(v).getTime())));
+
+async function cargarCargasImportadas() {
+  const cont = document.getElementById("lista-cargas");
+  if (!cont) return;
+  const snap = await getDocs(query(collection(db,"lotes_importacion"), orderBy("fecha_hora","desc"), limit(15)));
+  lotesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (!lotesCache.length) { cont.innerHTML = '<div class="empty-state" style="padding:14px 0 18px;"><p style="font-size:0.82rem;">Todavía no importaste ventas desde Excel.</p></div>'; return; }
+  cont.innerHTML = lotesCache.map(filaCarga).join("");
+}
+
+function filaCarga(l) {
+  const ts    = l.fecha_hora?.toDate?.();
+  const fecha = ts ? ts.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—";
+  const hora  = ts ? ts.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}) : "";
+  const desde = l.fecha_desde ? formatearFecha(l.fecha_desde, false) : null;
+  const hasta = l.fecha_corte ? formatearFecha(l.fecha_corte, false) : null;
+  const periodo = hasta ? (desde ? `${desde} → ${hasta}` : `hasta ${hasta}`) : "sin fecha de período";
+  const ing = l.total_ingredientes ? ` · ${l.total_ingredientes} ${l.total_ingredientes===1?"ingrediente":"ingredientes"}` : "";
+  const resumen = `${l.total_productos||0} ${(l.total_productos===1)?"producto":"productos"}${ing} · ${l.total_movimientos||0} mov.`;
+  const accion = l.anulado
+    ? `<span style="font-size:0.66rem;background:var(--bg-secondary);color:var(--critico-txt);padding:3px 9px;border-radius:10px;font-weight:700;white-space:nowrap;">Anulada</span>`
+    : `<button class="btn-icono danger" onclick="anularCargaUI('${l.id}')" title="Anular esta carga y devolver el stock" style="font-size:0.72rem;font-weight:700;padding:5px 11px;width:auto;border:1px solid var(--critico-txt);border-radius:8px;color:var(--critico-txt);white-space:nowrap;">Anular</button>`;
+  const anuladaMeta = l.anulado
+    ? `<div style="font-size:0.7rem;color:var(--texto-3);margin-top:2px;">Anulada por ${escHtml(l.nombre_usuario_anulo || "—")}${l.fecha_anulacion?.toDate ? " · " + l.fecha_anulacion.toDate().toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit"}) : ""}</div>`
+    : "";
+  return `<div class="mov-row" style="${l.anulado?'opacity:0.6;':''}">
+    <div class="mov-header">
+      <span class="mov-producto">${icono("corte",{size:13})} ${escHtml(periodo)}</span>
+      <div style="display:flex;align-items:center;gap:8px;">${accion}</div>
+    </div>
+    <div class="mov-meta">${fecha} ${hora} · ${escHtml(resumen)} · ${escHtml(l.nombre_usuario||"—")}${anuladaMeta}</div>
+  </div>`;
+}
+
+window.anularCargaUI = (loteId) => {
+  const l = lotesCache.find(x => x.id === loteId);
+  if (!l || l.anulado) return;
+  const desde = l.fecha_desde ? formatearFecha(l.fecha_desde, false) : null;
+  const hasta = l.fecha_corte ? formatearFecha(l.fecha_corte, false) : null;
+  const periodo = hasta ? (desde ? `${desde} → ${hasta}` : `hasta ${hasta}`) : "sin fecha";
+  mostrarConfirm(
+    `¿Anular la carga de ventas (${periodo})? Se devolverá el stock descontado a ` +
+    `${l.total_productos||0} producto(s), se borrarán sus ${l.total_movimientos||0} movimiento(s) ` +
+    `y se restaurará la fecha de corte anterior. Después vas a poder volver a importar el reporte.`,
+    () => anularCarga(l)
+  );
+};
+
+async function anularCarga(l) {
+  const cont = document.getElementById("lista-cargas");
+  try {
+    const MAX_OPS = 450;
+    let batch = writeBatch(db);
+    let ops = 0;
+    const flushBatch = async () => { if (ops >= MAX_OPS) { await batch.commit(); batch = writeBatch(db); ops = 0; } };
+
+    // 1) Revertir el stock: sumar el OPUESTO de cada delta aplicado.
+    for (const d of (l.deltas || [])) {
+      if (!productos.some(p => p.id === d.id_producto)) continue;   // producto borrado: no se toca
+      await flushBatch();
+      batch.update(doc(db,"productos",d.id_producto), { [d.campo]: increment(-d.delta) });
+      ops++;
+    }
+
+    // 2) Restaurar ventas_hasta SOLO si esta carga fue la última en fijarlo (si una
+    //    carga posterior lo avanzó más, no lo pisamos: dejamos la fecha más nueva).
+    const corteMs = _ms(l.fecha_corte);
+    for (const vh of (l.ventas_hasta_prev || [])) {
+      const prod = productos.find(p => p.id === vh.id_producto);
+      if (!prod) continue;
+      if (corteMs != null && _ms(prod.ventas_hasta) !== corteMs) continue;   // otra carga lo avanzó
+      await flushBatch();
+      batch.update(doc(db,"productos",vh.id_producto), { ventas_hasta: vh.anterior ?? null });
+      ops++;
+    }
+
+    // 3) Borrar todos los movimientos de esta carga.
+    const movSnap = await getDocs(query(collection(db,"movimientos"), where("lote_id","==",l.id)));
+    for (const m of movSnap.docs) {
+      await flushBatch();
+      batch.delete(doc(db,"movimientos",m.id));
+      ops++;
+    }
+
+    // 4) Marcar el lote como anulado (queda el registro; no se borra).
+    await flushBatch();
+    batch.update(doc(db,"lotes_importacion",l.id), {
+      anulado: true,
+      id_usuario_anulo: auth.currentUser?.uid || null,
+      nombre_usuario_anulo: usuarioActual?.nombre || null,
+      fecha_anulacion: serverTimestamp()
+    });
+    ops++;
+
+    if (ops > 0) await batch.commit();
+
+    // Refrescar UI (el onSnapshot de productos ya recalcula stock/corte).
+    cargarCargasImportadas();
+    cargarMovRecientes();
+    if (movimientosCached.length) cargarHistorial();
+  } catch (err) {
+    if (cont) cont.innerHTML = `<div class="empty-state"><p style="color:var(--critico-txt);">Error al anular: ${escHtml(err.message)}</p></div>`;
+  }
 }
 
 // ── EDITAR RETIRO (producto, cantidad, motivo) + ELIMINAR ─────
