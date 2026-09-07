@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Diagnóstico de stock — Green Garden</title>
+<style>
+  :root{
+    --verde:#2d6a4f; --verde-claro:#e8f3ec; --borde:#e2ddd2; --bg:#f8f4ea;
+    --texto:#2b2b28; --texto-2:#555049; --texto-3:#8a8377; --ok:#2d6a4f;
+    --mal:#b23b3b; --mal-bg:#fbeaea; --aviso:#9a7f43; --aviso-bg:#fbf3e3;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--texto);
+    font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px;}
+  h1{font-size:1.15rem;margin:0 0 2px;color:var(--verde);}
+  .sub{color:var(--texto-3);font-size:0.8rem;margin-bottom:16px;}
+  .card{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:16px;margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+  label{display:block;font-size:0.78rem;color:var(--texto-3);margin-bottom:4px;font-weight:600;}
+  input,select{width:100%;padding:9px 11px;border:1px solid var(--borde);border-radius:8px;font-size:0.9rem;background:#fff;}
+  button{background:var(--verde);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:700;
+    font-size:0.88rem;cursor:pointer;}
+  button.sec{background:#fff;color:var(--verde);border:1px solid var(--verde);}
+  button:disabled{opacity:0.5;cursor:default;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .row>div{flex:1;min-width:140px;}
+  .msg{padding:9px 12px;border-radius:8px;font-size:0.84rem;margin-top:10px;display:none;}
+  .msg.show{display:block;}
+  .msg.err{background:var(--mal-bg);color:var(--mal);}
+  .msg.ok{background:var(--verde-claro);color:var(--verde);}
+  table{width:100%;border-collapse:collapse;font-size:0.8rem;}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--borde);vertical-align:top;}
+  th{color:var(--texto-3);font-weight:700;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.04em;}
+  .tag{display:inline-block;font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;}
+  .tag.anul{background:var(--mal-bg);color:var(--mal);}
+  .tag.viva{background:var(--verde-claro);color:var(--verde);}
+  .flag-ok{color:var(--ok);font-weight:700;}
+  .flag-mal{color:var(--mal);font-weight:700;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.78rem;}
+  .scroll{overflow-x:auto;}
+  details{margin-top:8px;}
+  summary{cursor:pointer;font-weight:700;color:var(--verde);font-size:0.85rem;}
+  .hint{font-size:0.76rem;color:var(--texto-3);margin-top:6px;}
+  #copiaTxt{width:100%;height:120px;font-family:ui-monospace,monospace;font-size:0.72rem;margin-top:8px;
+    border:1px solid var(--borde);border-radius:8px;padding:8px;display:none;}
+</style>
+</head>
+<body>
+
+<h1>🍃 Diagnóstico de stock</h1>
+<div class="sub">Solo lectura — no modifica nada. Green Garden Inventario.</div>
+
+<!-- LOGIN -->
+<div class="card" id="cardLogin" style="display:none;">
+  <div class="row">
+    <div><label>Email</label><input id="email" type="email" autocomplete="username" /></div>
+    <div><label>Contraseña</label><input id="pass" type="password" autocomplete="current-password" /></div>
+    <div style="flex:0 0 auto;"><button id="btnLogin">Ingresar</button></div>
+  </div>
+  <div class="msg err" id="msgLogin"></div>
+</div>
+
+<!-- PANEL -->
+<div id="panel" style="display:none;">
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>Rubro a analizar</label>
+        <select id="filtroRubro"><option value="">Todos los rubros</option></select>
+      </div>
+      <div style="flex:0 0 auto;"><button id="btnCargar">Analizar</button></div>
+      <div style="flex:0 0 auto;"><button class="sec" id="btnCopiar" disabled>Copiar diagnóstico</button></div>
+      <div style="flex:0 0 auto;"><button class="sec" id="btnSalir">Salir</button></div>
+    </div>
+    <div class="msg ok" id="msgPanel"></div>
+    <textarea id="copiaTxt" readonly></textarea>
+    <div class="hint">Tip: apretá <b>Analizar</b>, revisá lo de abajo y después <b>Copiar diagnóstico</b> para pegármelo en el chat.</div>
+  </div>
+
+  <div id="resultado"></div>
+</div>
+
+<script type="module">
+import { auth, db } from "./js/firebase-config.js";
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { collection, getDocs, doc, getDoc, query, orderBy }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const $ = (id) => document.getElementById(id);
+const esDespacho = (p) => p.tipo === "Despacho";
+const fmt = (n) => (Math.round((n + Number.EPSILON) * 1000) / 1000);
+const aFecha = (v) => v == null ? null : (v.toDate ? v.toDate() : (v instanceof Date ? v : (isNaN(new Date(v)) ? null : new Date(v))));
+const fFecha = (v) => { const d = aFecha(v); return d ? d.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"; };
+const fFechaHora = (v) => { const d = aFecha(v); return d ? d.toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "—"; };
+const esc = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+let DATA = null;   // { productos, lotes, movimientos }
+let ULTIMO = null; // texto para copiar
+
+// ── Auth ──────────────────────────────────────────────
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { $("cardLogin").style.display = ""; $("panel").style.display = "none"; return; }
+  // Verificar que el usuario esté activo (las reglas lo exigen para leer)
+  try {
+    const snap = await getDoc(doc(db, "usuarios", user.uid));
+    if (!snap.exists() || snap.data().activo !== true) {
+      await signOut(auth);
+      $("cardLogin").style.display = "";
+      showMsg($("msgLogin"), "err", "Tu cuenta no está activa.");
+      return;
+    }
+  } catch (e) { /* si falla la lectura igual dejamos intentar */ }
+  $("cardLogin").style.display = "none";
+  $("panel").style.display = "";
+});
+
+$("btnLogin").addEventListener("click", async () => {
+  try {
+    await signInWithEmailAndPassword(auth, $("email").value.trim(), $("pass").value);
+  } catch (e) {
+    showMsg($("msgLogin"), "err", "No se pudo ingresar: " + (e.code || e.message));
+  }
+});
+$("pass").addEventListener("keydown", (e) => { if (e.key === "Enter") $("btnLogin").click(); });
+$("btnSalir").addEventListener("click", () => signOut(auth));
+
+// ── Cargar datos ──────────────────────────────────────
+$("btnCargar").addEventListener("click", cargar);
+
+async function cargar() {
+  const btn = $("btnCargar"); btn.disabled = true; btn.textContent = "Analizando…";
+  try {
+    const [pSnap, lSnap, mSnap] = await Promise.all([
+      getDocs(collection(db, "productos")),
+      getDocs(collection(db, "lotes_importacion")),
+      getDocs(query(collection(db, "movimientos"), orderBy("fecha_hora", "desc"))),
+    ]);
+    DATA = {
+      productos: pSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      lotes:     lSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      movimientos: mSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    };
+    // Poblar rubros
+    const rubros = [...new Set(DATA.productos.map(p => p.rubro).filter(Boolean))].sort();
+    const sel = $("filtroRubro");
+    const actual = sel.value;
+    sel.innerHTML = '<option value="">Todos los rubros</option>' +
+      rubros.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("");
+    sel.value = actual;
+    render();
+    $("btnCopiar").disabled = false;
+    showMsg($("msgPanel"), "ok", `Cargado: ${DATA.productos.length} productos · ${DATA.lotes.length} cargas · ${DATA.movimientos.length} movimientos.`);
+  } catch (e) {
+    showMsg($("msgPanel"), "err", "Error al leer: " + (e.code || e.message));
+  } finally {
+    btn.disabled = false; btn.textContent = "Analizar";
+  }
+}
+
+// ── Reconciliación y render ───────────────────────────
+function render() {
+  const rubro = $("filtroRubro").value;
+  const productos = DATA.productos.filter(esDespacho).filter(p => !rubro || p.rubro === rubro)
+    .sort((a,b) => (a.nombre||"").localeCompare(b.nombre||""));
+  const idsScope = new Set(productos.map(p => p.id));
+
+  // Movimientos de los productos en foco
+  const movs = DATA.movimientos.filter(m => idsScope.has(m.id_producto));
+
+  // Índice: movimientos por lote_id (para chequear anulaciones)
+  const movsPorLote = {};
+  DATA.movimientos.forEach(m => { if (m.lote_id) (movsPorLote[m.lote_id] ||= []).push(m); });
+
+  // ── Reconciliación por producto/sector ──
+  // ventasVigentes = suma de VENTA (origen=sector) que SIGUEN existiendo
+  // deltasNoAnulados = suma de deltas de lotes NO anulados para ese sector
+  const recon = {}; // prodId -> { sector -> { ventas, ajustes, deltaLotes } }
+  const ensure = (pid, s) => (((recon[pid] ||= {})[s] ||= { ventas:0, ajustes:0, deltaLotes:0 }));
+  for (const m of movs) {
+    const s = m.origen;
+    if (!s) continue;
+    if (m.tipo === "VENTA")  ensure(m.id_producto, s).ventas += (+m.cantidad || 0);
+    if (m.tipo === "AJUSTE") {
+      const mm = String(m.motivo||"").match(/\(([-\d.,]+)\s*→\s*([-\d.,]+)\)/);
+      if (mm) ensure(m.id_producto, s).ajustes += (parseFloat(mm[2].replace(",",".")) - parseFloat(mm[1].replace(",",".")));
+    }
+  }
+  for (const l of DATA.lotes) {
+    if (l.anulado) continue;
+    for (const d of (l.deltas || [])) {
+      if (!idsScope.has(d.id_producto)) continue;
+      const mm = String(d.campo||"").match(/^stock_despacho\.(.+)$/);
+      if (!mm) continue;
+      ensure(d.id_producto, mm[1]).deltaLotes += (+d.delta || 0);
+    }
+  }
+
+  // ── Chequeos de lotes ──
+  const lotesChecks = DATA.lotes
+    .filter(l => (l.deltas||[]).some(d => idsScope.has(d.id_producto)) ||
+                 (l.productos_venta||[]).some(id => idsScope.has(id)))
+    .sort((a,b) => (aFecha(b.fecha_hora)?.getTime()||0) - (aFecha(a.fecha_hora)?.getTime()||0));
+
+  // ── Render productos ──
+  let html = "";
+  html += `<div class="card"><h1 style="font-size:0.95rem;">Productos de despacho${rubro?` · ${esc(rubro)}`:""}</h1>`;
+  html += `<div class="scroll"><table><thead><tr>
+    <th>Producto</th><th>Sector</th><th>Stock app</th><th>Ventas vivas</th><th>Δ lotes activos</th><th>Ajustes</th><th>¿Coincide venta/lote?</th><th>Ventas al</th>
+  </tr></thead><tbody>`;
+  for (const p of productos) {
+    const sects = p.sectores_asignados || Object.keys(p.stock_despacho || {});
+    if (!sects.length) sects.push("(sin sector)");
+    sects.forEach((s, i) => {
+      const r = (recon[p.id]?.[s]) || { ventas:0, ajustes:0, deltaLotes:0 };
+      const stock = p.stock_despacho?.[s];
+      // Δ lotes activos debería ser ≈ −ventas vivas (las ventas descuentan)
+      const difVL = fmt(r.deltaLotes + r.ventas);
+      const coincide = Math.abs(difVL) < 0.001;
+      html += `<tr>
+        <td>${i===0?`<b>${esc(p.nombre)}</b>${p.plu?` <span class="mono" style="color:var(--texto-3)">PLU ${esc(p.plu)}</span>`:""}`:""}</td>
+        <td>${esc(s)}</td>
+        <td class="mono">${stock==null?"—":fmt(stock)}</td>
+        <td class="mono">${fmt(r.ventas)}</td>
+        <td class="mono">${fmt(r.deltaLotes)}</td>
+        <td class="mono">${r.ajustes?fmt(r.ajustes):"—"}</td>
+        <td class="${coincide?'flag-ok':'flag-mal'}">${coincide?"✓ ok":`✗ dif ${difVL}`}</td>
+        <td>${i===0?fFecha(p.ventas_hasta):""}</td>
+      </tr>`;
+    });
+  }
+  html += `</tbody></table></div>
+    <div class="hint"><b>Ventas vivas</b>: suma de ventas que aún figuran en el historial.
+    <b>Δ lotes activos</b>: lo que las cargas NO anuladas dicen haber descontado (negativo).
+    Si una carga sigue activa pero sus ventas se borraron (o al revés), la columna “¿Coincide?” marca ✗.</div></div>`;
+
+  // ── Render lotes ──
+  html += `<div class="card"><h1 style="font-size:0.95rem;">Cargas de importación (lotes)</h1><div class="scroll"><table><thead><tr>
+    <th>Fecha carga</th><th>Período</th><th>Estado</th><th>Movs. que quedan</th><th>Δ de estos productos</th><th>Detalle</th>
+  </tr></thead><tbody>`;
+  for (const l of lotesChecks) {
+    const movsL = movsPorLote[l.id] || [];
+    const scopeDeltas = (l.deltas||[]).filter(d => idsScope.has(d.id_producto));
+    const detalle = scopeDeltas.map(d => `${nombreDe(d.id_producto)} · ${esc(d.campo.replace("stock_despacho.",""))} : ${fmt(d.delta)}`).join("<br>");
+    // Chequeo de coherencia anulado ↔ movimientos
+    let estadoFlag = "";
+    if (l.anulado && movsL.length) estadoFlag = ` <span class="flag-mal">⚠ anulado con ${movsL.length} movs vivos</span>`;
+    if (!l.anulado && (l.total_movimientos||0) > 0 && movsL.length === 0) estadoFlag = ` <span class="flag-mal">⚠ activo sin movs</span>`;
+    html += `<tr>
+      <td>${fFechaHora(l.fecha_hora)}<div class="mono" style="color:var(--texto-3);font-size:0.68rem;">${esc(l.id)}</div></td>
+      <td>${fFecha(l.fecha_desde)} → ${fFecha(l.fecha_corte)}</td>
+      <td><span class="tag ${l.anulado?'anul':'viva'}">${l.anulado?'ANULADA':'activa'}</span>${estadoFlag}</td>
+      <td class="mono">${movsL.length} / ${l.total_movimientos||0}</td>
+      <td class="mono">${scopeDeltas.length}</td>
+      <td class="mono" style="font-size:0.72rem;">${detalle||"—"}</td>
+    </tr>`;
+  }
+  html += `</tbody></table></div></div>`;
+
+  // ── Movimientos crudos ──
+  html += `<div class="card"><details><summary>Ver movimientos de estos productos (${movs.length})</summary>
+    <div class="scroll" style="margin-top:8px;"><table><thead><tr>
+      <th>Fecha</th><th>Producto</th><th>Tipo</th><th>Cant.</th><th>Origen</th><th>Destino</th><th>Motivo</th><th>Lote</th>
+    </tr></thead><tbody>`;
+  for (const m of movs) {
+    html += `<tr>
+      <td>${fFechaHora(m.fecha_hora)}</td><td>${esc(m.nombre_producto)}</td><td>${esc(m.tipo)}</td>
+      <td class="mono">${fmt(+m.cantidad||0)}</td><td>${esc(m.origen)}</td><td>${esc(m.destino)}</td>
+      <td style="font-size:0.72rem;">${esc(m.motivo)}</td>
+      <td class="mono" style="font-size:0.66rem;color:var(--texto-3);">${esc(m.lote_id||"")}</td>
+    </tr>`;
+  }
+  html += `</tbody></table></div></details></div>`;
+
+  $("resultado").innerHTML = html;
+
+  // ── Texto para copiar ──
+  ULTIMO = construirTextoCopia(productos, recon, lotesChecks, movsPorLote, movs);
+}
+
+function nombreDe(id) {
+  const p = DATA.productos.find(x => x.id === id);
+  return esc(p ? p.nombre : id);
+}
+
+function construirTextoCopia(productos, recon, lotes, movsPorLote, movs) {
+  const out = {
+    generado: new Date().toISOString(),
+    rubro: $("filtroRubro").value || "TODOS",
+    productos: productos.map(p => {
+      const sects = p.sectores_asignados || Object.keys(p.stock_despacho||{});
+      return {
+        nombre: p.nombre, plu: p.plu || null, id: p.id,
+        ventas_hasta: p.ventas_hasta ? fFecha(p.ventas_hasta) : null,
+        sectores: sects.map(s => {
+          const r = recon[p.id]?.[s] || { ventas:0, ajustes:0, deltaLotes:0 };
+          return {
+            sector: s,
+            stock_app: fmt(p.stock_despacho?.[s] ?? 0),
+            ventas_vivas: fmt(r.ventas),
+            delta_lotes_activos: fmt(r.deltaLotes),
+            ajustes: fmt(r.ajustes),
+            dif_venta_vs_lote: fmt(r.deltaLotes + r.ventas),
+          };
+        }),
+      };
+    }),
+    lotes: lotes.map(l => ({
+      id: l.id, fecha: fFechaHora(l.fecha_hora),
+      periodo: `${fFecha(l.fecha_desde)} → ${fFecha(l.fecha_corte)}`,
+      anulado: !!l.anulado,
+      total_movimientos: l.total_movimientos || 0,
+      movs_vivos: (movsPorLote[l.id] || []).length,
+      tiene_productos_venta: Array.isArray(l.productos_venta),
+      deltas_scope: (l.deltas||[]).filter(d => productos.some(p => p.id === d.id_producto))
+        .map(d => ({ prod: nombreDe(d.id_producto).replace(/<[^>]+>/g,""), campo: d.campo, delta: fmt(d.delta) })),
+    })),
+    movimientos: movs.map(m => ({
+      fecha: fFechaHora(m.fecha_hora), prod: m.nombre_producto, tipo: m.tipo,
+      cant: fmt(+m.cantidad||0), origen: m.origen, destino: m.destino,
+      motivo: m.motivo, lote: m.lote_id || null,
+    })),
+  };
+  return JSON.stringify(out, null, 1);
+}
+
+// ── Copiar ────────────────────────────────────────────
+$("btnCopiar").addEventListener("click", async () => {
+  if (!ULTIMO) return;
+  try {
+    await navigator.clipboard.writeText(ULTIMO);
+    showMsg($("msgPanel"), "ok", "✓ Diagnóstico copiado. Pegámelo en el chat.");
+  } catch (e) {
+    // Fallback: mostrar textarea para copiar a mano
+    const ta = $("copiaTxt"); ta.style.display = "block"; ta.value = ULTIMO; ta.select();
+    showMsg($("msgPanel"), "ok", "Copiá el texto del recuadro y pegámelo en el chat.");
+  }
+});
+
+function showMsg(el, tipo, txt) { el.className = `msg show ${tipo}`; el.textContent = txt; }
+</script>
+</body>
+</html>
