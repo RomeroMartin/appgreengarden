@@ -70,6 +70,7 @@
         <select id="filtroRubro"><option value="">Todos los rubros</option></select>
       </div>
       <div style="flex:0 0 auto;"><button id="btnCargar">Actualizar</button></div>
+      <div style="flex:0 0 auto;"><button class="sec" id="btnCopiarLista" disabled>Copiar lista de conteo</button></div>
       <div style="flex:0 0 auto;"><button class="sec" id="btnCopiar" disabled>Copiar diagnóstico</button></div>
       <div style="flex:0 0 auto;"><button class="sec" id="btnSalir">Salir</button></div>
     </div>
@@ -97,7 +98,8 @@ const fFechaHora = (v) => { const d = aFecha(v); return d ? d.toLocaleString("es
 const esc = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
 let DATA = null;   // { productos, lotes, movimientos }
-let ULTIMO = null; // texto para copiar
+let ULTIMO = null; // texto para copiar (diagnóstico completo)
+let ULTIMA_LISTA = null; // texto compacto: lista de conteo por producto/sector
 
 // ── Auth ──────────────────────────────────────────────
 onAuthStateChanged(auth, async (user) => {
@@ -154,6 +156,7 @@ async function cargar() {
     sel.value = actual;
     render();
     $("btnCopiar").disabled = false;
+    $("btnCopiarLista").disabled = false;
     showMsg($("msgPanel"), "ok", `Cargado: ${DATA.productos.length} productos · ${DATA.lotes.length} cargas · ${DATA.movimientos.length} movimientos.`);
   } catch (e) {
     showMsg($("msgPanel"), "err", "Error al leer: " + (e.code || e.message));
@@ -297,6 +300,20 @@ function render() {
 
   // ── Texto para copiar ──
   ULTIMO = construirTextoCopia(productos, espCache, lotesChecks, movsPorLote, movs);
+
+  // Lista compacta de conteo (sin movimientos): una línea por producto/sector.
+  const lineas = [`LISTA DE CONTEO — rubro: ${$("filtroRubro").value || "TODOS"} — ${productos.length} productos`,
+                  `(app = lo que muestra la app | esperado = según movimientos | dif = app − esperado)`, ``];
+  for (const p of productos) {
+    const sects = p.sectores_asignados || Object.keys(p.stock_despacho || {});
+    (sects.length ? sects : ["(sin sector)"]).forEach(s => {
+      const e = espCache[p.id+"|"+s] || { val: null };
+      const stock = p.stock_despacho?.[s] ?? 0;
+      const dif = e.val == null ? null : fmt(stock - e.val);
+      lineas.push(`${p.rubro||"—"} | ${p.nombre}${p.plu?` (PLU ${p.plu})`:""} | ${s} | app=${fmt(stock)} | esperado=${e.val==null?"s/ancla":e.val} | dif=${dif==null?"—":(dif>0?"+"+dif:dif)}`);
+    });
+  }
+  ULTIMA_LISTA = lineas.join("\n");
 }
 
 function nombreDe(id) {
@@ -353,6 +370,17 @@ $("btnCopiar").addEventListener("click", async () => {
   } catch (e) {
     // Fallback: mostrar textarea para copiar a mano
     const ta = $("copiaTxt"); ta.style.display = "block"; ta.value = ULTIMO; ta.select();
+    showMsg($("msgPanel"), "ok", "Copiá el texto del recuadro y pegámelo en el chat.");
+  }
+});
+
+$("btnCopiarLista").addEventListener("click", async () => {
+  if (!ULTIMA_LISTA) return;
+  try {
+    await navigator.clipboard.writeText(ULTIMA_LISTA);
+    showMsg($("msgPanel"), "ok", "✓ Lista de conteo copiada. Pegámela en el chat.");
+  } catch (e) {
+    const ta = $("copiaTxt"); ta.style.display = "block"; ta.value = ULTIMA_LISTA; ta.select();
     showMsg($("msgPanel"), "ok", "Copiá el texto del recuadro y pegámelo en el chat.");
   }
 });
