@@ -217,6 +217,8 @@ function render() {
       else if (m.tipo === "VENTA"  && m.origen === s) val -= c;
       else if (m.tipo === "RETIRO" && m.destino === s) val += c;
       else if (m.tipo === "RETIRO" && m.origen  === s) val -= c;
+      else if (m.tipo === "ANULACION" && m.destino === s) val += c;   // reversión de venta anulada
+      else if (m.tipo === "ANULACION" && m.origen  === s) val -= c;
     }
     return { val: +val.toFixed(3), ancla };
   }

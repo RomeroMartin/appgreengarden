@@ -1340,10 +1340,38 @@ async function anularCarga(l) {
     const flushBatch = async () => { if (ops >= MAX_OPS) { await batch.commit(); batch = writeBatch(db); ops = 0; } };
 
     // 1) Revertir el stock: sumar el OPUESTO de cada delta aplicado.
+    //    Además, dejamos un MOVIMIENTO de reversión por cada ajuste, para que el
+    //    contador nunca cambie "en silencio": toda modificación de stock queda
+    //    reflejada en el historial y es auditable (antes anular devolvía stock
+    //    sin registrar nada, y el contador se despegaba del historial).
+    const dLbl = l.fecha_corte ? formatearFecha(l.fecha_corte, false) : "sin fecha";
+    const periodoLbl = l.fecha_desde ? `${formatearFecha(l.fecha_desde, false)} → ${dLbl}` : `hasta ${dLbl}`;
     for (const d of (l.deltas || [])) {
-      if (!productos.some(p => p.id === d.id_producto)) continue;   // producto borrado: no se toca
+      const prod = productos.find(p => p.id === d.id_producto);
+      if (!prod) continue;   // producto borrado: no se toca
       await flushBatch();
       batch.update(doc(db,"productos",d.id_producto), { [d.campo]: increment(-d.delta) });
+      ops++;
+      // Movimiento de reversión (informativo; el stock lo mueve el increment de arriba).
+      const rev = -d.delta;                                   // lo que se devuelve al stock
+      const mm = String(d.campo).match(/^stock_despacho\.(.+)$/);
+      const sector = mm ? mm[1] : "acopio";                   // sector de despacho o acopio
+      const entra = rev >= 0;                                 // ¿vuelve a entrar al sector?
+      await flushBatch();
+      batch.set(doc(collection(db,"movimientos")), {
+        fecha_hora: serverTimestamp(),
+        id_usuario: auth.currentUser?.uid || null,
+        nombre_usuario: usuarioActual?.nombre || null,
+        id_producto: prod.id,
+        nombre_producto: prod.nombre,
+        tipo: "ANULACION",
+        cantidad: Math.abs(rev),
+        unidad: prod.unidad_medida,
+        motivo: `Anulación carga importación (${periodoLbl})`,
+        origen: entra ? "anulacion" : sector,
+        destino: entra ? sector : "anulacion",
+        anulacion_lote_id: l.id
+      });
       ops++;
     }
 

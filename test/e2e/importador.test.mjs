@@ -153,7 +153,7 @@ test("cada importación registra un lote anulable", async () => {
   assert.ok((lote.deltas || []).length, "el lote guarda los deltas para revertir");
 });
 
-test("anular una carga devuelve el stock, borra sus movimientos y restaura el corte", async () => {
+test("anular una carga devuelve el stock, deja un movimiento de reversión y restaura el corte", async () => {
   const p0 = store.get("productos", "p-agua");
   const stockAntes = p0.stock_despacho.Barra;
   const vhAntes    = p0.ventas_hasta ?? null;
@@ -176,7 +176,15 @@ test("anular una carga devuelve el stock, borra sus movimientos y restaura el co
 
   const pFinal = store.get("productos", "p-agua");
   assert.equal(pFinal.stock_despacho.Barra, stockAntes, "el stock volvió a su valor previo");
-  assert.equal(store.count("movimientos"), movsAntes, "se borró el movimiento de la carga");
+  // La VENTA de la carga se borra, pero queda un movimiento ANULACION auditable
+  // (el contador nunca cambia en silencio): neto = movsAntes + 1 reversión.
+  const movs = store.dump("movimientos");
+  assert.equal(movs.filter(m => m.lote_id === lote.id).length, 0, "no queda ninguna VENTA de la carga");
+  const rev = movs.filter(m => m.tipo === "ANULACION" && m.anulacion_lote_id === lote.id);
+  assert.equal(rev.length, 1, "quedó 1 movimiento de reversión");
+  assert.equal(rev[0].cantidad, 9, "la reversión devuelve las 9 unidades");
+  assert.equal(rev[0].destino, "Barra", "la reversión reingresa al sector Barra");
+  assert.equal(store.count("movimientos"), movsAntes + 1, "queda solo la reversión");
   assert.deepEqual(_ms(pFinal.ventas_hasta), _ms(vhAntes), "ventas_hasta se restauró");
   assert.equal(store.get("lotes_importacion", lote.id).anulado, true, "el lote queda marcado como anulado");
 });
