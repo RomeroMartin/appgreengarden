@@ -1347,16 +1347,50 @@ async function anularCarga(l) {
       ops++;
     }
 
-    // 2) Restaurar ventas_hasta SOLO si esta carga fue la última en fijarlo (si una
-    //    carga posterior lo avanzó más, no lo pisamos: dejamos la fecha más nueva).
-    const corteMs = _ms(l.fecha_corte);
-    for (const vh of (l.ventas_hasta_prev || [])) {
-      const prod = productos.find(p => p.id === vh.id_producto);
-      if (!prod) continue;
-      if (corteMs != null && _ms(prod.ventas_hasta) !== corteMs) continue;   // otra carga lo avanzó
-      await flushBatch();
-      batch.update(doc(db,"productos",vh.id_producto), { ventas_hasta: vh.anterior ?? null });
-      ops++;
+    // 2) Recalcular ventas_hasta de cada producto afectado.
+    //    NO alcanza con restaurar el "anterior" guardado ni con comparar contra
+    //    el corte de ESTA carga: si otras cargas (no anuladas) también cargaron
+    //    ventas del mismo producto, su corte sigue vigente. Restaurar a ciegas
+    //    dejaba ventas_hasta apuntando a una fecha vieja (o null) mientras las
+    //    ventas de esas otras cargas seguían descontadas → el producto figuraba
+    //    "sin ventas" y la guarda anti-doble-importación dejaba de proteger,
+    //    habilitando un doble descuento silencioso en la próxima importación.
+    //    Regla correcta: ventas_hasta = corte MÁS RECIENTE entre las cargas NO
+    //    anuladas (excluida ésta) que cargaron ventas de ese producto; si no
+    //    queda ninguna, se vuelve al valor previo a esta carga ("anterior").
+    // Productos que cubre un lote: preferimos "productos_venta" (todos los que
+    // recibieron ventas, avancen o no el corte); para lotes viejos sin ese campo,
+    // caemos a los ids de "ventas_hasta_prev".
+    const cubiertosDe = (lote) => (lote.productos_venta && lote.productos_venta.length)
+      ? lote.productos_venta
+      : (lote.ventas_hasta_prev || []).map(v => v.id_producto);
+    const productosARecalcular = cubiertosDe(l);
+    if (productosARecalcular.length) {
+      // Todas las cargas NO anuladas, salvo la que estamos anulando.
+      const otrasSnap = await getDocs(query(collection(db,"lotes_importacion"), where("anulado","==",false)));
+      const otras = otrasSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => x.id !== l.id);
+      // prodId → corte más reciente (ms) entre las cargas vigentes que lo cubren.
+      const corteVigente = new Map();
+      for (const otro of otras) {
+        const oMs = _ms(otro.fecha_corte);
+        if (oMs == null) continue;
+        for (const pid of cubiertosDe(otro)) {
+          const prev = corteVigente.get(pid);
+          if (prev == null || oMs > prev) corteVigente.set(pid, oMs);
+        }
+      }
+      // Valor previo por producto (solo lo tienen los que ESTA carga avanzó).
+      const anteriorDe = new Map((l.ventas_hasta_prev || []).map(v => [v.id_producto, v.anterior ?? null]));
+      for (const pid of productosARecalcular) {
+        if (!productos.some(p => p.id === pid)) continue;   // producto borrado
+        const vigenteMs = corteVigente.get(pid);
+        // Otra carga vigente cubre este producto → dejamos SU corte (más reciente).
+        // Ninguna → volvemos al valor previo a esta carga (o null).
+        const nuevoValor = vigenteMs != null ? new Date(vigenteMs) : (anteriorDe.get(pid) ?? null);
+        await flushBatch();
+        batch.update(doc(db,"productos",pid), { ventas_hasta: nuevoValor });
+        ops++;
+      }
     }
 
     // 3) Borrar todos los movimientos de esta carga.

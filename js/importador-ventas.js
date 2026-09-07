@@ -416,6 +416,9 @@ async function confirmarImportacion() {
     const stockDeltas = new Map();  // prodId -> Map(`stock_despacho.${sector}` -> deltaTotal)
     const ventasHasta = new Map();  // prodId -> Date (corte a fijar)
     const ventasHastaPrev = new Map(); // prodId -> valor ANTERIOR de ventas_hasta (para poder anular)
+    const productosVenta  = new Set(); // ids de los productos con ventas de ESTA carga (para
+                                        // recalcular ventas_hasta al anular, incluso si el corte
+                                        // no avanzó — p. ej. reimportar el mismo período)
     const movs        = [];         // movimientos a crear (uno por línea, para el historial)
     let ventasProcesadas = 0;
     let ingredientesDescontados = 0;
@@ -427,6 +430,7 @@ async function confirmarImportacion() {
     };
 
     for (const f of aDescontar) {
+      if (_fechaCorte) productosVenta.add(f.prod.id);   // este producto quedó cargado hasta _fechaCorte
       const avanza = _fechaCorte && debeAvanzar(f.prod.ventas_hasta, _fechaCorte);
       if (avanza) {
         // Guardamos el valor previo UNA sola vez (el real, antes de esta carga):
@@ -525,6 +529,7 @@ async function confirmarImportacion() {
       total_movimientos: movs.length,
       deltas: deltasLote,
       ventas_hasta_prev: ventasHastaPrevArr,
+      productos_venta: [...productosVenta],
       anulado: false
     };
 
