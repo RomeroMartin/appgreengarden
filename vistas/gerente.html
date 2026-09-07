@@ -83,6 +83,7 @@
       <button class="tab-btn" data-tab="config"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M12 3.3 19.5 7.6v8.8L12 20.7 4.5 16.4V7.6Z"/><circle cx="12" cy="12" r="3.2"/></svg>Config</button>
       <button class="tab-btn" data-tab="usuarios"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M15.5 20.5v-1.5a3.5 3.5 0 0 0-3.5-3.5H7a3.5 3.5 0 0 0-3.5 3.5v1.5"/><circle cx="9.5" cy="8" r="3.5"/><path d="M20.5 20.5v-1.5a3.5 3.5 0 0 0-2.6-3.4"/><path d="M15.5 4.6a3.5 3.5 0 0 1 0 6.8"/></svg>Usuarios</button>
       <button class="tab-btn" data-tab="historial"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><circle cx="4.5" cy="6" r="1.1"/><circle cx="4.5" cy="12" r="1.1"/><circle cx="4.5" cy="18" r="1.1"/></svg>Historial</button>
+      <button class="tab-btn" data-tab="auditoria"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;margin-right:4px"><path d="M9.5 3.5h5a1 1 0 0 1 1 1V6h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-12a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h2V4.5a1 1 0 0 1 1-1Z"/><path d="M9 13l2 2 4-4"/></svg>Auditoría</button>
     </div>
 
     <!-- TAB STOCK -->
@@ -255,6 +256,38 @@
         <div id="lista-historial"><div class="empty-state"><div class="spinner spinner-verde"></div></div></div>
       </div>
       <button class="btn btn-secondary" id="btn-cargar-mas" style="margin-top:12px;display:none;">Cargar más</button>
+    </div>
+
+    <!-- TAB AUDITORÍA -->
+    <div class="tab-content" id="tab-auditoria">
+      <div class="card" style="padding:16px 20px;margin-bottom:14px;">
+        <p class="card-title">Auditoría de stock de despacho</p>
+        <p style="font-size:0.8rem;color:var(--texto-3);margin-bottom:12px;">
+          Compara el stock que muestra la app contra el <b>esperado según los movimientos</b>
+          (último conteo físico del sector + ventas, reposiciones y ajustes posteriores).
+          Sirve para detectar dónde el contador se despegó del historial.
+        </p>
+        <div class="flex gap-8" style="margin-bottom:10px;">
+          <select class="form-control" id="audit-rubro" style="flex:1;font-size:0.85rem;padding:9px 12px;"><option value="">Todos los rubros</option></select>
+          <button class="btn btn-secondary btn-sm" id="btn-audit-analizar">Analizar</button>
+        </div>
+        <div class="msg" id="audit-msg" style="display:none;"></div>
+        <div id="audit-resultado"><div class="empty-state" style="padding:16px 0;"><p style="font-size:0.82rem;">Apretá <b>Analizar</b> para revisar el stock.</p></div></div>
+      </div>
+
+      <div class="card" style="padding:16px 20px;border:1px solid var(--critico-txt);">
+        <p class="card-title" style="color:var(--critico-txt);">Restablecer stock a 0 por rubro</p>
+        <p style="font-size:0.8rem;color:var(--texto-3);margin-bottom:12px;">
+          Pone en <b>0</b> el stock de despacho de <b>todos</b> los productos de un rubro (todos sus sectores).
+          Queda registrado como AJUSTE en el historial. Útil para arrancar de cero antes de un conteo.
+          <b>No afecta el acopio.</b> Acción delicada: pide confirmación.
+        </p>
+        <div class="flex gap-8">
+          <select class="form-control" id="audit-cero-rubro" style="flex:1;font-size:0.85rem;padding:9px 12px;"><option value="">Elegí un rubro…</option></select>
+          <button class="btn btn-danger btn-sm" id="btn-audit-cero">Poner en 0</button>
+        </div>
+        <div class="msg" id="audit-cero-msg" style="display:none;"></div>
+      </div>
     </div>
 
   </div>

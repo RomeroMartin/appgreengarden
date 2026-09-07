@@ -2091,6 +2091,179 @@ document.getElementById("btn-exportar-excel").addEventListener("click", async ()
 });
 
 // ── CONFIRMACIÓN Y UTILIDADES ─────────────────────────────────
+// ── AUDITORÍA DE STOCK DE DESPACHO ────────────────────────────
+// Compara el stock de la app contra el ESPERADO según movimientos y permite
+// reajustar (al esperado) o restablecer a 0 por rubro. Todo queda como AJUSTE.
+let auditEsp = {};   // "pid|sector" -> { val, ancla } del último análisis
+
+const _audFecha = (v) => v == null ? null : (v.toDate ? v.toDate().getTime() : (v instanceof Date ? v.getTime() : (isNaN(new Date(v)) ? null : new Date(v).getTime())));
+const _audValAjuste = (m) => { const mm = String(m.motivo||"").match(/→\s*(-?[\d.,]+)\s*\)/); return mm ? parseFloat(mm[1].replace(",",".")) : null; };
+
+// Stock esperado de un sector: último AJUSTE (ancla) + movimientos posteriores.
+function _audEsperado(movsAsc, s) {
+  let idx = -1, val = null;
+  for (let i = movsAsc.length - 1; i >= 0; i--) {
+    const m = movsAsc[i];
+    if (m.tipo === "AJUSTE" && m.origen === s && m.destino === s) { const v = _audValAjuste(m); if (v != null) { val = v; idx = i; break; } }
+  }
+  if (idx === -1) return { val: null, ancla: null };
+  const ancla = _audFecha(movsAsc[idx].fecha_hora);
+  for (let i = idx + 1; i < movsAsc.length; i++) {
+    const m = movsAsc[i], c = (+m.cantidad || 0);
+    if (m.tipo === "AJUSTE" && m.origen === s && m.destino === s) { const v = _audValAjuste(m); if (v != null) val = v; }
+    else if (m.tipo === "VENTA"     && m.origen  === s) val -= c;
+    else if (m.tipo === "RETIRO"    && m.destino === s) val += c;
+    else if (m.tipo === "RETIRO"    && m.origen  === s) val -= c;
+    else if (m.tipo === "ANULACION" && m.destino === s) val += c;
+    else if (m.tipo === "ANULACION" && m.origen  === s) val -= c;
+  }
+  return { val: +val.toFixed(3), ancla };
+}
+
+function poblarRubrosAudit() {
+  const rbs = [...new Set(productos.filter(esDespacho).map(p => p.rubro).filter(Boolean))].sort();
+  for (const id of ["audit-rubro", "audit-cero-rubro"]) {
+    const sel = document.getElementById(id); if (!sel) continue;
+    const prev = sel.value;
+    const base = id === "audit-cero-rubro" ? '<option value="">Elegí un rubro…</option>' : '<option value="">Todos los rubros</option>';
+    sel.innerHTML = base + rbs.map(r => `<option value="${escHtml(r)}">${escHtml(r)}</option>`).join("");
+    sel.value = prev;
+  }
+}
+
+async function analizarAuditoria() {
+  const cont = document.getElementById("audit-resultado");
+  const msg  = document.getElementById("audit-msg");
+  const btn  = document.getElementById("btn-audit-analizar");
+  const rubro = document.getElementById("audit-rubro").value;
+  btn.disabled = true; btn.textContent = "Analizando…";
+  msg.style.display = "none";
+  try {
+    const snap = await getDocs(query(collection(db, "movimientos"), orderBy("fecha_hora", "asc")));
+    const movsAsc = snap.docs.map(d => d.data());
+    const porProd = {};
+    for (const m of movsAsc) { if (m.id_producto) (porProd[m.id_producto] ||= []).push(m); }
+
+    const lista = productos.filter(esDespacho).filter(p => !rubro || p.rubro === rubro)
+      .sort((a,b) => (a.nombre||"").localeCompare(b.nombre||""));
+    auditEsp = {};
+    let filas = "", nOff = 0;
+    for (const p of lista) {
+      const sects = sectoresDe(p).length ? sectoresDe(p) : Object.keys(p.stock_despacho || {});
+      sects.forEach((s, i) => {
+        const stock = p.stock_despacho?.[s] ?? 0;
+        const e = _audEsperado(porProd[p.id] || [], s);
+        auditEsp[p.id+"|"+s] = e;
+        const dif = e.val == null ? null : +(stock - e.val).toFixed(3);
+        const ok  = dif != null && Math.abs(dif) < 0.001;
+        const ajustable = e.val != null && dif != null && !ok;
+        if (ajustable) nOff++;
+        filas += `<tr>
+          <td style="padding:6px 6px;">${ajustable ? `<input type="checkbox" class="aud-chk" data-pid="${escHtml(p.id)}" data-sector="${escHtml(s)}" data-esp="${e.val}" data-app="${stock}" data-nombre="${escHtml(p.nombre)}" data-unidad="${escHtml(p.unidad_medida||"")}" style="width:16px;height:16px;accent-color:var(--verde);">` : ""}</td>
+          <td style="padding:6px 6px;font-size:0.8rem;">${i===0?`<b>${escHtml(p.nombre)}</b>`:""}</td>
+          <td style="padding:6px 6px;font-size:0.8rem;color:var(--texto-3);">${escHtml(s)}</td>
+          <td style="padding:6px 6px;text-align:right;font-family:ui-monospace,monospace;">${fmtN(stock)}</td>
+          <td style="padding:6px 6px;text-align:right;font-family:ui-monospace,monospace;">${e.val==null?'<span style="color:var(--texto-3);">s/ancla</span>':fmtN(e.val)}</td>
+          <td style="padding:6px 6px;text-align:right;font-family:ui-monospace,monospace;font-weight:700;color:${dif==null?'var(--texto-3)':(ok?'var(--verde)':'var(--critico-txt)')};">${dif==null?"—":(ok?"✓":(dif>0?`+${fmtN(dif)}`:fmtN(dif)))}</td>
+        </tr>`;
+      });
+    }
+
+    cont.innerHTML = `
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="border-bottom:1px solid var(--borde);">
+            <th style="padding:6px;"><input type="checkbox" id="aud-chk-todos" style="width:16px;height:16px;accent-color:var(--verde);"></th>
+            <th style="padding:6px;text-align:left;font-size:0.7rem;color:var(--texto-3);">Producto</th>
+            <th style="padding:6px;text-align:left;font-size:0.7rem;color:var(--texto-3);">Sector</th>
+            <th style="padding:6px;text-align:right;font-size:0.7rem;color:var(--texto-3);">App</th>
+            <th style="padding:6px;text-align:right;font-size:0.7rem;color:var(--texto-3);">Esperado</th>
+            <th style="padding:6px;text-align:right;font-size:0.7rem;color:var(--texto-3);">Dif</th>
+          </tr></thead>
+          <tbody>${filas || '<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--texto-3);">Sin productos de despacho.</td></tr>'}</tbody>
+        </table>
+      </div>
+      ${nOff ? `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-secondary btn-sm" id="btn-audit-reajustar" style="border-color:var(--verde);color:var(--verde);">Reajustar seleccionados al esperado</button>
+        <span style="font-size:0.76rem;color:var(--texto-3);">${nOff} sector(es) con diferencia. Marcá los que quieras dejar en su esperado.</span>
+      </div>` : `<p style="margin-top:12px;font-size:0.8rem;color:var(--verde);font-weight:600;">Todo coincide con el historial ✓</p>`}
+      <p style="margin-top:10px;font-size:0.74rem;color:var(--texto-3);">Ojo: el “esperado” es confiable solo si las reposiciones se cargaron siempre. Donde dé negativo o “s/ancla”, hacé conteo físico en lugar de reajustar.</p>`;
+
+    const todos = document.getElementById("aud-chk-todos");
+    if (todos) todos.addEventListener("change", () => document.querySelectorAll(".aud-chk").forEach(c => c.checked = todos.checked));
+    const btnR = document.getElementById("btn-audit-reajustar");
+    if (btnR) btnR.addEventListener("click", reajustarAuditoria);
+  } catch (e) {
+    msg.style.display = ""; msg.className = "msg show msg-error"; msg.textContent = "Error al analizar: " + (e.code || e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "Analizar";
+  }
+}
+
+function reajustarAuditoria() {
+  const filas = [...document.querySelectorAll(".aud-chk")].filter(c => c.checked).map(c => ({
+    pid: c.dataset.pid, sector: c.dataset.sector,
+    esp: parseFloat(c.dataset.esp), app: parseFloat(c.dataset.app),
+    nombre: c.dataset.nombre, unidad: c.dataset.unidad,
+  }));
+  if (!filas.length) return;
+  const prev = filas.slice(0, 10).map(f => `• ${f.nombre} / ${f.sector}: ${fmtN(f.app)} → ${fmtN(f.esp)}`).join("\n");
+  const extra = filas.length > 10 ? `\n… y ${filas.length - 10} más` : "";
+  mostrarConfirm(`Reajustar ${filas.length} sector(es) al valor esperado:\n\n${prev}${extra}\n\nQueda como AJUSTE en el historial.`, async () => {
+    const MAX = 400; let batch = writeBatch(db); let ops = 0;
+    for (const f of filas) {
+      const delta = +(f.esp - f.app).toFixed(4);
+      if (!delta) continue;
+      if (ops >= MAX) { await batch.commit(); batch = writeBatch(db); ops = 0; }
+      batch.update(doc(db, "productos", f.pid), { [`stock_despacho.${f.sector}`]: increment(delta) }); ops++;
+      batch.set(doc(collection(db, "movimientos")), {
+        fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null, nombre_usuario: usuarioActual?.nombre || null,
+        id_producto: f.pid, nombre_producto: f.nombre, tipo: "AJUSTE", cantidad: Math.abs(delta), unidad: f.unidad,
+        motivo: `Recálculo s/movimientos ${f.sector} (${fmtN(f.app)} → ${fmtN(f.esp)})`, origen: f.sector, destino: f.sector,
+      }); ops++;
+    }
+    if (ops > 0) await batch.commit();
+    analizarAuditoria();
+  });
+}
+
+async function restablecerRubroCero(rubro) {
+  const lista = productos.filter(esDespacho).filter(p => p.rubro === rubro);
+  const msg = document.getElementById("audit-cero-msg");
+  const MAX = 400; let batch = writeBatch(db); let ops = 0; let tocados = 0;
+  try {
+    for (const p of lista) {
+      const sects = sectoresDe(p).length ? sectoresDe(p) : Object.keys(p.stock_despacho || {});
+      for (const s of sects) {
+        const actual = p.stock_despacho?.[s] ?? 0;
+        if (!actual) continue;   // ya está en 0
+        if (ops >= MAX) { await batch.commit(); batch = writeBatch(db); ops = 0; }
+        batch.update(doc(db, "productos", p.id), { [`stock_despacho.${s}`]: increment(-actual) }); ops++;
+        batch.set(doc(collection(db, "movimientos")), {
+          fecha_hora: serverTimestamp(), id_usuario: auth.currentUser?.uid || null, nombre_usuario: usuarioActual?.nombre || null,
+          id_producto: p.id, nombre_producto: p.nombre, tipo: "AJUSTE", cantidad: Math.abs(actual), unidad: p.unidad_medida,
+          motivo: `Reset a 0 ${s} (${fmtN(actual)} → 0)`, origen: s, destino: s,
+        }); ops++;
+        tocados++;
+      }
+    }
+    if (ops > 0) await batch.commit();
+    msg.style.display = ""; msg.className = "msg show msg-ok"; msg.textContent = `✓ Puestos en 0: ${tocados} sector(es) del rubro ${rubro}.`;
+  } catch (e) {
+    msg.style.display = ""; msg.className = "msg show msg-error"; msg.textContent = "Error: " + (e.code || e.message);
+  }
+}
+
+document.querySelector('.tab-btn[data-tab="auditoria"]')?.addEventListener("click", poblarRubrosAudit);
+document.getElementById("btn-audit-analizar")?.addEventListener("click", analizarAuditoria);
+document.getElementById("btn-audit-cero")?.addEventListener("click", () => {
+  const rubro = document.getElementById("audit-cero-rubro").value;
+  const msg = document.getElementById("audit-cero-msg");
+  if (!rubro) { msg.style.display = ""; msg.className = "msg show msg-error"; msg.textContent = "Elegí un rubro."; return; }
+  const n = productos.filter(esDespacho).filter(p => p.rubro === rubro).length;
+  mostrarConfirm(`¿Poner en 0 el stock de despacho de TODOS los productos del rubro "${rubro}" (${n} producto/s)? Queda registrado como AJUSTE. No afecta el acopio.`, () => restablecerRubroCero(rubro));
+});
+
 function mostrarConfirm(texto, cb) {
   document.getElementById("confirm-texto").textContent = texto;
   confirmCallback = cb;
