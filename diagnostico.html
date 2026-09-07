@@ -86,7 +86,7 @@
 import { auth, db } from "./js/firebase-config.js";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { collection, getDocs, doc, getDoc, query, orderBy }
+import { collection, getDocs, doc, getDoc, query, orderBy, writeBatch, increment, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const $ = (id) => document.getElementById(id);
@@ -100,6 +100,8 @@ const esc = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").re
 let DATA = null;   // { productos, lotes, movimientos }
 let ULTIMO = null; // texto para copiar (diagnóstico completo)
 let ULTIMA_LISTA = null; // texto compacto: lista de conteo por producto/sector
+let USUARIO = null; // { uid, nombre, rol }
+const puedeAjustar = () => USUARIO && (USUARIO.rol === "Gerente" || USUARIO.rol === "Administrador");
 
 // ── Auth ──────────────────────────────────────────────
 onAuthStateChanged(auth, async (user) => {
@@ -113,6 +115,7 @@ onAuthStateChanged(auth, async (user) => {
       showMsg($("msgLogin"), "err", "Tu cuenta no está activa.");
       return;
     }
+    USUARIO = { uid: user.uid, nombre: snap.data().nombre || "—", rol: snap.data().rol || null };
   } catch (e) { /* si falla la lectura igual dejamos intentar */ }
   $("cardLogin").style.display = "none";
   $("panel").style.display = "";
@@ -233,7 +236,9 @@ function render() {
   const espCache = {}; // pid|sector -> {val, ancla}
   let html = "";
   html += `<div class="card"><h1 style="font-size:0.95rem;">Productos de despacho${rubro?` · ${esc(rubro)}`:""}</h1>`;
+  const conAjuste = puedeAjustar();
   html += `<div class="scroll"><table><thead><tr>
+    ${conAjuste?'<th title="Marcar para reajustar al esperado"><input type="checkbox" id="chkTodos"></th>':''}
     <th>Producto</th><th>Sector</th><th>Stock app</th><th>Esperado s/movimientos</th><th>Diferencia</th><th>Último conteo</th><th>Ventas al</th>
   </tr></thead><tbody>`;
   for (const p of productos) {
@@ -244,7 +249,13 @@ function render() {
       const e = esperadoDe(p.id, s); espCache[p.id+"|"+s] = e;
       const dif = (stock != null && e.val != null) ? fmt(stock - e.val) : null;
       const ok = dif != null && Math.abs(dif) < 0.001;
+      // Ajustable: hay ancla (esperado calculable) y hay diferencia real.
+      const ajustable = conAjuste && e.val != null && dif != null && !ok && s !== "(sin sector)";
+      const chkCell = conAjuste
+        ? `<td>${ajustable?`<input type="checkbox" class="chkFix" data-pid="${esc(p.id)}" data-sector="${esc(s)}" data-esp="${e.val}" data-app="${stock==null?0:fmt(stock)}" data-nombre="${esc(p.nombre)}" data-unidad="${esc(p.unidad_medida||"")}">`:""}</td>`
+        : "";
       html += `<tr>
+        ${chkCell}
         <td>${i===0?`<b>${esc(p.nombre)}</b>${p.plu?` <span class="mono" style="color:var(--texto-3)">PLU ${esc(p.plu)}</span>`:""}`:""}</td>
         <td>${esc(s)}</td>
         <td class="mono">${stock==null?"—":fmt(stock)}</td>
@@ -258,7 +269,15 @@ function render() {
   html += `</tbody></table></div>
     <div class="hint"><b>Esperado s/movimientos</b>: lo que debería haber según el historial (último conteo físico del sector + ventas y reposiciones posteriores).
     <b>Diferencia = Stock app − Esperado</b>: si es positiva, la app tiene de MÁS (inflado); negativa, de menos.
-    El historial suele ser fiel a la realidad; el campo de stock puede haberse despegado. Usá <b>Conteo físico</b> para dejar cada sector en su valor real (idealmente el que contás; el “Esperado” es un buen control).</div></div>`;
+    El historial suele ser fiel a la realidad; el campo de stock puede haberse despegado. Usá <b>Conteo físico</b> para dejar cada sector en su valor real (idealmente el que contás; el “Esperado” es un buen control).</div>`;
+  if (conAjuste) {
+    html += `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--borde);">
+      <button id="btnAplicarFix">Reajustar seleccionados al esperado</button>
+      <div class="hint">Marcá las filas que quieras reajustar y aplicá: deja cada sector en su <b>Esperado</b> (queda como AJUSTE en el historial, igual que un conteo físico). Se recomienda usarlo solo donde confíes en el historial; para pastelería, mejor tu conteo real.</div>
+      <div class="msg" id="msgFix"></div>
+    </div>`;
+  }
+  html += `</div>`;
 
   // ── Render lotes ──
   html += `<div class="card"><h1 style="font-size:0.95rem;">Cargas de importación (lotes)</h1><div class="scroll"><table><thead><tr>
@@ -299,6 +318,14 @@ function render() {
   html += `</tbody></table></div></details></div>`;
 
   $("resultado").innerHTML = html;
+
+  // Cableado del recálculo (solo Gerente/Admin)
+  const chkTodos = $("chkTodos");
+  if (chkTodos) chkTodos.addEventListener("change", () => {
+    document.querySelectorAll(".chkFix").forEach(c => { c.checked = chkTodos.checked; });
+  });
+  const btnFix = $("btnAplicarFix");
+  if (btnFix) btnFix.addEventListener("click", aplicarRecalculo);
 
   // ── Texto para copiar ──
   ULTIMO = construirTextoCopia(productos, espCache, lotesChecks, movsPorLote, movs);
@@ -361,6 +388,46 @@ function construirTextoCopia(productos, espCache, lotes, movsPorLote, movs) {
     })),
   };
   return JSON.stringify(out, null, 1);
+}
+
+// ── Reajustar stock al esperado (solo Gerente/Admin) ──
+async function aplicarRecalculo() {
+  if (!puedeAjustar()) return;
+  const filas = [...document.querySelectorAll(".chkFix")].filter(c => c.checked).map(c => ({
+    pid: c.dataset.pid, sector: c.dataset.sector,
+    esp: parseFloat(c.dataset.esp), app: parseFloat(c.dataset.app),
+    nombre: c.dataset.nombre, unidad: c.dataset.unidad,
+  }));
+  const msg = $("msgFix");
+  if (!filas.length) { showMsg(msg, "err", "No marcaste ninguna fila."); return; }
+  const resumen = filas.slice(0, 12).map(f => `• ${f.nombre} / ${f.sector}: ${fmt(f.app)} → ${fmt(f.esp)}`).join("\n");
+  const extra = filas.length > 12 ? `\n… y ${filas.length - 12} más` : "";
+  if (!confirm(`Vas a reajustar ${filas.length} sector(es) de stock al valor esperado:\n\n${resumen}${extra}\n\nQueda registrado como AJUSTE en el historial. ¿Confirmás?`)) return;
+
+  const btn = $("btnAplicarFix"); btn.disabled = true; const txt0 = btn.textContent; btn.textContent = "Aplicando…";
+  try {
+    let hechos = 0;
+    for (const f of filas) {
+      const delta = +(f.esp - f.app).toFixed(4);
+      if (!delta) continue;
+      const batch = writeBatch(db);
+      batch.update(doc(db, "productos", f.pid), { [`stock_despacho.${f.sector}`]: increment(delta) });
+      batch.set(doc(collection(db, "movimientos")), {
+        fecha_hora: serverTimestamp(), id_usuario: USUARIO.uid, nombre_usuario: USUARIO.nombre,
+        id_producto: f.pid, nombre_producto: f.nombre, tipo: "AJUSTE", cantidad: Math.abs(delta),
+        unidad: f.unidad, motivo: `Recálculo s/movimientos ${f.sector} (${fmt(f.app)} → ${fmt(f.esp)})`,
+        origen: f.sector, destino: f.sector,
+      });
+      await batch.commit();
+      hechos++;
+    }
+    showMsg(msg, "ok", `✓ Reajustados ${hechos} sector(es). Refrescando…`);
+    setTimeout(cargar, 700);
+  } catch (e) {
+    showMsg(msg, "err", "Error al aplicar: " + (e.code || e.message));
+  } finally {
+    btn.disabled = false; btn.textContent = txt0;
+  }
 }
 
 // ── Copiar ────────────────────────────────────────────
