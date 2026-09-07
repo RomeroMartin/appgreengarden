@@ -176,28 +176,46 @@ function render() {
   const movsPorLote = {};
   DATA.movimientos.forEach(m => { if (m.lote_id) (movsPorLote[m.lote_id] ||= []).push(m); });
 
-  // ── Reconciliación por producto/sector ──
-  // ventasVigentes = suma de VENTA (origen=sector) que SIGUEN existiendo
-  // deltasNoAnulados = suma de deltas de lotes NO anulados para ese sector
-  const recon = {}; // prodId -> { sector -> { ventas, ajustes, deltaLotes } }
-  const ensure = (pid, s) => (((recon[pid] ||= {})[s] ||= { ventas:0, ajustes:0, deltaLotes:0 }));
-  for (const m of movs) {
-    const s = m.origen;
-    if (!s) continue;
-    if (m.tipo === "VENTA")  ensure(m.id_producto, s).ventas += (+m.cantidad || 0);
-    if (m.tipo === "AJUSTE") {
-      const mm = String(m.motivo||"").match(/\(([-\d.,]+)\s*→\s*([-\d.,]+)\)/);
-      if (mm) ensure(m.id_producto, s).ajustes += (parseFloat(mm[2].replace(",",".")) - parseFloat(mm[1].replace(",",".")));
+  // ── Reconstrucción del stock ESPERADO según los movimientos ──
+  // El campo de stock puede haberse despegado de la realidad (p. ej. porque
+  // anular una carga devuelve stock SIN dejar movimiento). El historial de
+  // movimientos, en cambio, sí es fiel. Reconstruimos el stock que DEBERÍA
+  // tener cada sector: tomamos como ancla el ÚLTIMO conteo físico de ese
+  // sector (un AJUSTE con origen=destino=sector, que fija un valor absoluto)
+  // y le sumamos/restamos todos los movimientos POSTERIORES:
+  //   • VENTA con origen=sector           → resta
+  //   • RETIRO con destino=sector          → suma (reposición desde acopio)
+  //   • RETIRO con origen=sector           → resta (merma/rotura desde el sector)
+  //   • AJUSTE en el sector                → vuelve a fijar el valor
+  const valorAjuste = (m) => {
+    const mm = String(m.motivo||"").match(/→\s*(-?[\d.,]+)\s*\)/);
+    return mm ? parseFloat(mm[1].replace(",",".")) : null;
+  };
+  // Movimientos por producto, ordenados de más viejo a más nuevo.
+  const movsProd = {};
+  DATA.movimientos.forEach(m => { if (idsScope.has(m.id_producto)) (movsProd[m.id_producto] ||= []).push(m); });
+  Object.values(movsProd).forEach(arr => arr.sort((a,b) => (aFecha(a.fecha_hora)?.getTime()||0) - (aFecha(b.fecha_hora)?.getTime()||0)));
+
+  function esperadoDe(pid, s) {
+    const arr = movsProd[pid] || [];
+    let idx = -1, val = null;
+    for (let i = arr.length - 1; i >= 0; i--) {              // último ancla (AJUSTE en el sector)
+      const m = arr[i];
+      if (m.tipo === "AJUSTE" && m.origen === s && m.destino === s) {
+        const v = valorAjuste(m);
+        if (v != null) { val = v; idx = i; break; }
+      }
     }
-  }
-  for (const l of DATA.lotes) {
-    if (l.anulado) continue;
-    for (const d of (l.deltas || [])) {
-      if (!idsScope.has(d.id_producto)) continue;
-      const mm = String(d.campo||"").match(/^stock_despacho\.(.+)$/);
-      if (!mm) continue;
-      ensure(d.id_producto, mm[1]).deltaLotes += (+d.delta || 0);
+    if (idx === -1) return { val: null, ancla: null };
+    const ancla = aFecha(arr[idx].fecha_hora);
+    for (let i = idx + 1; i < arr.length; i++) {
+      const m = arr[i], c = (+m.cantidad || 0);
+      if (m.tipo === "AJUSTE" && m.origen === s && m.destino === s) { const v = valorAjuste(m); if (v != null) val = v; }
+      else if (m.tipo === "VENTA"  && m.origen === s) val -= c;
+      else if (m.tipo === "RETIRO" && m.destino === s) val += c;
+      else if (m.tipo === "RETIRO" && m.origen  === s) val -= c;
     }
+    return { val: +val.toFixed(3), ancla };
   }
 
   // ── Chequeos de lotes ──
@@ -207,36 +225,35 @@ function render() {
     .sort((a,b) => (aFecha(b.fecha_hora)?.getTime()||0) - (aFecha(a.fecha_hora)?.getTime()||0));
 
   // ── Render productos ──
+  const espCache = {}; // pid|sector -> {val, ancla}
   let html = "";
   html += `<div class="card"><h1 style="font-size:0.95rem;">Productos de despacho${rubro?` · ${esc(rubro)}`:""}</h1>`;
   html += `<div class="scroll"><table><thead><tr>
-    <th>Producto</th><th>Sector</th><th>Stock app</th><th>Ventas vivas</th><th>Δ lotes activos</th><th>Ajustes</th><th>¿Coincide venta/lote?</th><th>Ventas al</th>
+    <th>Producto</th><th>Sector</th><th>Stock app</th><th>Esperado s/movimientos</th><th>Diferencia</th><th>Último conteo</th><th>Ventas al</th>
   </tr></thead><tbody>`;
   for (const p of productos) {
     const sects = p.sectores_asignados || Object.keys(p.stock_despacho || {});
     if (!sects.length) sects.push("(sin sector)");
     sects.forEach((s, i) => {
-      const r = (recon[p.id]?.[s]) || { ventas:0, ajustes:0, deltaLotes:0 };
       const stock = p.stock_despacho?.[s];
-      // Δ lotes activos debería ser ≈ −ventas vivas (las ventas descuentan)
-      const difVL = fmt(r.deltaLotes + r.ventas);
-      const coincide = Math.abs(difVL) < 0.001;
+      const e = esperadoDe(p.id, s); espCache[p.id+"|"+s] = e;
+      const dif = (stock != null && e.val != null) ? fmt(stock - e.val) : null;
+      const ok = dif != null && Math.abs(dif) < 0.001;
       html += `<tr>
         <td>${i===0?`<b>${esc(p.nombre)}</b>${p.plu?` <span class="mono" style="color:var(--texto-3)">PLU ${esc(p.plu)}</span>`:""}`:""}</td>
         <td>${esc(s)}</td>
         <td class="mono">${stock==null?"—":fmt(stock)}</td>
-        <td class="mono">${fmt(r.ventas)}</td>
-        <td class="mono">${fmt(r.deltaLotes)}</td>
-        <td class="mono">${r.ajustes?fmt(r.ajustes):"—"}</td>
-        <td class="${coincide?'flag-ok':'flag-mal'}">${coincide?"✓ ok":`✗ dif ${difVL}`}</td>
+        <td class="mono">${e.val==null?'<span style="color:var(--texto-3)">sin ancla</span>':fmt(e.val)}</td>
+        <td class="mono ${dif==null?'':(ok?'flag-ok':'flag-mal')}">${dif==null?"—":(ok?"✓ 0":(dif>0?`+${dif}`:dif))}</td>
+        <td class="mono" style="font-size:0.72rem;color:var(--texto-3);">${e.ancla?e.ancla.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit"}):"—"}</td>
         <td>${i===0?fFecha(p.ventas_hasta):""}</td>
       </tr>`;
     });
   }
   html += `</tbody></table></div>
-    <div class="hint"><b>Ventas vivas</b>: suma de ventas que aún figuran en el historial.
-    <b>Δ lotes activos</b>: lo que las cargas NO anuladas dicen haber descontado (negativo).
-    Si una carga sigue activa pero sus ventas se borraron (o al revés), la columna “¿Coincide?” marca ✗.</div></div>`;
+    <div class="hint"><b>Esperado s/movimientos</b>: lo que debería haber según el historial (último conteo físico del sector + ventas y reposiciones posteriores).
+    <b>Diferencia = Stock app − Esperado</b>: si es positiva, la app tiene de MÁS (inflado); negativa, de menos.
+    El historial suele ser fiel a la realidad; el campo de stock puede haberse despegado. Usá <b>Conteo físico</b> para dejar cada sector en su valor real (idealmente el que contás; el “Esperado” es un buen control).</div></div>`;
 
   // ── Render lotes ──
   html += `<div class="card"><h1 style="font-size:0.95rem;">Cargas de importación (lotes)</h1><div class="scroll"><table><thead><tr>
@@ -279,7 +296,7 @@ function render() {
   $("resultado").innerHTML = html;
 
   // ── Texto para copiar ──
-  ULTIMO = construirTextoCopia(productos, recon, lotesChecks, movsPorLote, movs);
+  ULTIMO = construirTextoCopia(productos, espCache, lotesChecks, movsPorLote, movs);
 }
 
 function nombreDe(id) {
@@ -287,7 +304,7 @@ function nombreDe(id) {
   return esc(p ? p.nombre : id);
 }
 
-function construirTextoCopia(productos, recon, lotes, movsPorLote, movs) {
+function construirTextoCopia(productos, espCache, lotes, movsPorLote, movs) {
   const out = {
     generado: new Date().toISOString(),
     rubro: $("filtroRubro").value || "TODOS",
@@ -297,14 +314,13 @@ function construirTextoCopia(productos, recon, lotes, movsPorLote, movs) {
         nombre: p.nombre, plu: p.plu || null, id: p.id,
         ventas_hasta: p.ventas_hasta ? fFecha(p.ventas_hasta) : null,
         sectores: sects.map(s => {
-          const r = recon[p.id]?.[s] || { ventas:0, ajustes:0, deltaLotes:0 };
+          const e = espCache[p.id+"|"+s] || { val: null };
+          const stock = p.stock_despacho?.[s] ?? 0;
           return {
             sector: s,
-            stock_app: fmt(p.stock_despacho?.[s] ?? 0),
-            ventas_vivas: fmt(r.ventas),
-            delta_lotes_activos: fmt(r.deltaLotes),
-            ajustes: fmt(r.ajustes),
-            dif_venta_vs_lote: fmt(r.deltaLotes + r.ventas),
+            stock_app: fmt(stock),
+            esperado_s_movimientos: e.val,
+            diferencia_app_menos_esperado: e.val == null ? null : fmt(stock - e.val),
           };
         }),
       };
