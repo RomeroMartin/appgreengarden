@@ -60,3 +60,45 @@ test("rechaza retiro por stock insuficiente", async () => {
   assert.equal(store.get("productos", "p-limon").stock_deposito, antes);
   assert.equal(store.count("movimientos"), movs);
 });
+
+test("vencimiento: por defecto se descuenta de un sector de despacho, no del acopio", async () => {
+  await click("btn-abrir-salida");
+  setSelect("sal-producto", "p-cerveza");
+  setSelect("sal-motivo", "2 - Vencimiento");
+  assert.notEqual(byId("sal-grupo-origen").style.display, "none", "aparece el selector de origen");
+  const origenSel = byId("sal-origen").value;
+  assert.notEqual(origenSel, "acopio", "por defecto NO es acopio");
+  const acopioAntes = store.get("productos", "p-cerveza").stock_deposito;
+  const sectorAntes = store.get("productos", "p-cerveza").stock_despacho[origenSel];
+  setValue("sal-cantidad", "1");
+  await click("btn-confirmar-salida");
+  const p = store.get("productos", "p-cerveza");
+  assert.equal(p.stock_deposito, acopioAntes, "el acopio no se toca");
+  assert.equal(p.stock_despacho[origenSel], sectorAntes - 1);
+});
+
+test("vencimiento: el Encargado puede optar por descontar del acopio también", async () => {
+  await click("btn-abrir-salida");
+  setSelect("sal-producto", "p-cerveza");
+  setSelect("sal-motivo", "2 - Vencimiento");
+  const opciones = [...byId("sal-origen").options].map(o => o.value);
+  assert.ok(opciones.includes("acopio"), "el selector ofrece Acopio como alternativa");
+  setSelect("sal-origen", "acopio");
+  const acopioAntes = store.get("productos", "p-cerveza").stock_deposito;
+  setValue("sal-cantidad", "1");
+  await click("btn-confirmar-salida");
+  assert.equal(store.get("productos", "p-cerveza").stock_deposito, acopioAntes - 1);
+});
+
+test("rotura y merma/desperdicio se comportan igual que Vencimiento (despacho por defecto, con opción de acopio)", async () => {
+  for (const motivo of ["3 - Rotura", "4 - Merma / Desperdicio"]) {
+    await click("btn-abrir-salida");
+    setSelect("sal-producto", "p-cerveza");
+    setSelect("sal-motivo", motivo);
+    assert.notEqual(byId("sal-grupo-origen").style.display, "none", `${motivo}: aparece el selector de origen`);
+    const origenSel = byId("sal-origen").value;
+    assert.notEqual(origenSel, "acopio", `${motivo}: por defecto NO es acopio`);
+    const opciones = [...byId("sal-origen").options].map(o => o.value);
+    assert.ok(opciones.includes("acopio"), `${motivo}: el selector ofrece Acopio como alternativa`);
+  }
+});

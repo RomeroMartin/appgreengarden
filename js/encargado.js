@@ -7,7 +7,8 @@ import { auth, db } from "./firebase-config.js";
 import { protegerRuta, logout } from "./auth.js";
 import {
   escHtml, fmtN, esDespacho, sectoresDe, stockTotal, getBadge,
-  acopioBajoOcero, origenRetiroActual, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida,
+  calcularOrigenRetiro, resolverOrigenRetiro, origenRetiroActual,
+  MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida,
   instalarCandadoMotivoReposicion
 } from "./core-inventario.js";
 import { icono } from "./iconos.js";
@@ -24,6 +25,11 @@ let movCache      = [];
 let usuarioActual = null;
 
 let motivosSalida = [...MOTIVOS_SALIDA_DEFAULT];
+
+// Encargado: en un retiro por descarte (Vencimiento/Rotura/Merma) el origen
+// por defecto es el sector de despacho, pero siempre puede optar por
+// descontarlo del acopio.
+const PERMITE_ELEGIR_ACOPIO = true;
 
 
 document.addEventListener("usuarioListo",(e)=>{
@@ -195,16 +201,21 @@ function actualizarInfoRetiro() {
   const grupoOrigen=document.getElementById("sal-grupo-origen");
   if(!prod){grupoSector.style.display="none";infoDestino.style.display="none";if(grupoOrigen)grupoOrigen.style.display="none";return;}
 
-  // ── Selector de origen inteligente ──
+  const motivoObj=motivosSalida.find(m=>m.nombre===document.getElementById("sal-motivo").value);
+
+  // ── Selector de origen inteligente (descarte → despacho por defecto;
+  // otros motivos → Acopio/despacho solo si el acopio está sin stock) ──
   let origenEsDespacho=false;
+  let origenForzado=null;
   if(grupoOrigen){
-    const despachoConStock=esDespacho(prod)?Object.entries(prod.stock_despacho||{}).filter(([,v])=>(v||0)>0):[];
-    if(acopioBajoOcero(prod)&&despachoConStock.length>0){
+    const infoOrigen=calcularOrigenRetiro(prod, motivoObj, PERMITE_ELEGIR_ACOPIO);
+    if(infoOrigen.mostrar){
       const sel=document.getElementById("sal-origen");
-      if(sel.dataset.prod!==prod.id){
-        const ops=[`<option value="acopio">Acopio (${fmtN(prod.stock_deposito??0)} ${prod.unidad_medida||""})</option>`];
-        despachoConStock.forEach(([s,v])=>ops.push(`<option value="${s}">${s} (${fmtN(v)} ${prod.unidad_medida||""})</option>`));
-        sel.innerHTML=ops.join("");
+      const clave=`${prod.id}::${motivoObj?.nombre??""}`;
+      if(sel.dataset.clave!==clave){
+        sel.innerHTML=infoOrigen.opciones.map(o=>`<option value="${o.value}">${o.label}</option>`).join("");
+        sel.value=infoOrigen.origenDefault;
+        sel.dataset.clave=clave;
         sel.dataset.prod=prod.id;
         sel.onchange=actualizarInfoRetiro;
       }
@@ -213,16 +224,16 @@ function actualizarInfoRetiro() {
     }else{
       grupoOrigen.style.display="none";
       document.getElementById("sal-origen").dataset.prod="";
+      if(infoOrigen.forzado){origenEsDespacho=true;origenForzado=infoOrigen.origenDefault;}
     }
   }
 
-  const motivoObj=motivosSalida.find(m=>m.nombre===document.getElementById("sal-motivo").value);
   const transfiere=!!(motivoObj&&motivoObj.transfiere)&&!origenEsDespacho;
 
   if(origenEsDespacho){
     grupoSector.style.display="none";
     infoDestino.style.display="";
-    const origen=origenRetiroActual();
+    const origen=origenForzado||origenRetiroActual();
     infoDestino.innerHTML=`<div style="background:var(--bajo-bg);border:1px solid #F0D9B5;border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--bajo-txt);">↓ Se descuenta de <strong>${origen}</strong> (sector de despacho). No suma a ningún otro lado.</div>`;
     return;
   }
@@ -277,8 +288,9 @@ document.getElementById("btn-confirmar-salida").addEventListener("click",async()
   const prod=productos.find(p=>p.id===prodId);
   if(!prod||cantidad<=0){mostrarMsg(msgEl,"error","Completá los campos.");return;}
 
-  const origen=origenRetiroActual();
-  // ── Retiro desde un sector de despacho (acopio sin stock) ──
+  const motivoObj=motivosSalida.find(m=>m.nombre===motivo);
+  const origen=resolverOrigenRetiro(prod, motivoObj, PERMITE_ELEGIR_ACOPIO);
+  // ── Retiro desde un sector de despacho (descarte, o acopio sin stock) ──
   if(origen!=="acopio"){
     const stockSector=prod.stock_despacho?.[origen]??0;
     if(cantidad>stockSector){mostrarMsg(msgEl,"error",`Stock insuficiente en ${origen}. Hay ${fmtN(stockSector)} ${prod.unidad_medida}.`);return;}

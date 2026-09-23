@@ -27,6 +27,9 @@ export function seedDefaults(opts = {}) {
   S.seed("motivos_salida", [
     { id: "m1", nombre: "1 - Reposición", transfiere: true },
     { id: "m2", nombre: "2 - Vencimiento", transfiere: false },
+    { id: "m3", nombre: "3 - Rotura", transfiere: false },
+    { id: "m4", nombre: "4 - Merma / Desperdicio", transfiere: false },
+    { id: "m5", nombre: "5 - Retiro para uso", transfiere: false },
   ]);
   S.seed("productos", [
     // Despacho con dos sectores

@@ -116,3 +116,33 @@ test("crear una materia prima nueva la guarda en productos", async () => {
   assert.equal(nuevo.tipo, "Materia prima");
   assert.equal(nuevo.stock_deposito, 7);
 });
+
+// ── RETIRO POR VENCIMIENTO ─────────────────────────────────────
+test("vencimiento: por defecto se descuenta de un sector de despacho, no del acopio", async () => {
+  await click("btn-mov-salida");
+  setSelect("sal-producto", "p-cerveza");
+  setSelect("sal-motivo", "2 - Vencimiento");
+  assert.notEqual(byId("sal-grupo-origen").style.display, "none", "aparece el selector de origen");
+  const origenSel = byId("sal-origen").value;
+  assert.notEqual(origenSel, "acopio", "por defecto NO es acopio");
+  const acopioAntes = store.get("productos", "p-cerveza").stock_deposito;
+  const sectorAntes = store.get("productos", "p-cerveza").stock_despacho[origenSel];
+  setValue("sal-cantidad", "1");
+  await click("btn-confirmar-salida");
+  const p = store.get("productos", "p-cerveza");
+  assert.equal(p.stock_deposito, acopioAntes, "el acopio no se toca");
+  assert.equal(p.stock_despacho[origenSel], sectorAntes - 1);
+});
+
+test("vencimiento: el Gerente puede optar por descontar del acopio también", async () => {
+  await click("btn-mov-salida");
+  setSelect("sal-producto", "p-cerveza");
+  setSelect("sal-motivo", "2 - Vencimiento");
+  const opciones = [...byId("sal-origen").options].map(o => o.value);
+  assert.ok(opciones.includes("acopio"), "el selector ofrece Acopio como alternativa");
+  setSelect("sal-origen", "acopio");
+  const acopioAntes = store.get("productos", "p-cerveza").stock_deposito;
+  setValue("sal-cantidad", "1");
+  await click("btn-confirmar-salida");
+  assert.equal(store.get("productos", "p-cerveza").stock_deposito, acopioAntes - 1);
+});

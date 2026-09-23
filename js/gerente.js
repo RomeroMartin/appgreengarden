@@ -11,8 +11,9 @@ import { renderResumen, badgeProducto, calcularResumen, debeAvanzar, formatearFe
 import { initConteo, abrirConteo, setProductosConteo } from "./conteo-fisico.js";
 import { calcularConsumoProduccion, agregarConsumoAlBatch } from "./produccion.js";
 import {
-  escHtml, fmtN, esDespacho, esReceta, sectoresDe, stockTotal, getBadge, acopioBajoOcero,
-  origenRetiroActual, aDatetimeLocal, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida,
+  escHtml, fmtN, esDespacho, esReceta, sectoresDe, stockTotal, getBadge,
+  calcularOrigenRetiro, resolverOrigenRetiro, origenRetiroActual,
+  aDatetimeLocal, MOTIVOS_SALIDA_DEFAULT, poblarMotivosSalida,
   instalarCandadoMotivoReposicion, ordenarMotivos
 } from "./core-inventario.js";
 import { icono } from "./iconos.js";
@@ -37,6 +38,11 @@ let movIndex          = {};   // id -> movimiento (para corregir motivo)
 let lotesCache        = [];   // lotes de importación (cargas masivas de ventas)
 let usuarioActual     = null;
 let confirmCallback   = null;
+
+// Gerente: en un retiro por descarte (Vencimiento/Rotura/Merma) el origen
+// por defecto es el sector de despacho, pero siempre puede optar por
+// descontarlo del acopio.
+const PERMITE_ELEGIR_ACOPIO = true;
 
 // Estado del editor de recetas
 function freshRecetaState() {
@@ -1009,22 +1015,23 @@ function actualizarInfoRetiro() {
     return;
   }
 
-  // ── Selector de origen inteligente ──
-  // Solo para productos de despacho con stock en algún sector, y cuando el acopio está bajo/cero
+  // ── Selector de origen inteligente (descarte → despacho por defecto,
+  // con opción de elegir acopio; otros motivos → Acopio/despacho solo si el
+  // acopio está bajo/cero) ──
+  const motivoObj = motivosSalida.find(m => m.nombre === document.getElementById("sal-motivo").value);
   let origenEsDespacho = false;
+  let origenForzado = null;
   if (grupoOrigen) {
-    const despachoConStock = esDespacho(prod)
-      ? Object.entries(prod.stock_despacho || {}).filter(([,v]) => (v||0) > 0)
-      : [];
-    if (acopioBajoOcero(prod) && despachoConStock.length > 0) {
+    const infoOrigen = calcularOrigenRetiro(prod, motivoObj, PERMITE_ELEGIR_ACOPIO);
+    if (infoOrigen.mostrar) {
       const sel = document.getElementById("sal-origen");
-      // Reconstruir las opciones SOLO si cambió el producto (no en cada cambio de origen),
-      // para no pisar la selección del usuario.
-      if (sel.dataset.prod !== prod.id) {
-        const opciones = [];
-        opciones.push(`<option value="acopio">Acopio (${fmtN(prod.stock_deposito ?? 0)} ${prod.unidad_medida||""})</option>`);
-        despachoConStock.forEach(([s,v]) => opciones.push(`<option value="${s}">${s} (${v} ${prod.unidad_medida||""})</option>`));
-        sel.innerHTML = opciones.join("");
+      // Reconstruir las opciones SOLO si cambió el producto o el motivo (no en
+      // cada cambio de origen), para no pisar la selección del usuario.
+      const clave = `${prod.id}::${motivoObj?.nombre ?? ""}`;
+      if (sel.dataset.clave !== clave) {
+        sel.innerHTML = infoOrigen.opciones.map(o => `<option value="${o.value}">${o.label}</option>`).join("");
+        sel.value = infoOrigen.origenDefault;
+        sel.dataset.clave = clave;
         sel.dataset.prod = prod.id;
         sel.onchange = actualizarInfoRetiro;
       }
@@ -1033,18 +1040,18 @@ function actualizarInfoRetiro() {
     } else {
       grupoOrigen.style.display = "none";
       document.getElementById("sal-origen").dataset.prod = "";
+      if (infoOrigen.forzado) { origenEsDespacho = true; origenForzado = infoOrigen.origenDefault; }
     }
   }
 
   // Si el origen elegido es un despacho, el retiro NO puede transferir (no se repone del despacho al despacho)
-  const motivoObj  = motivosSalida.find(m => m.nombre === document.getElementById("sal-motivo").value);
   const transfiere = !!(motivoObj && motivoObj.transfiere) && !origenEsDespacho;
 
   if (origenEsDespacho) {
     // Retiro desde un sector de despacho: solo consumo, sin transferencia
     grupoSector.style.display = "none";
     infoDestino.style.display = "";
-    const origen = origenRetiroActual();
+    const origen = origenForzado || origenRetiroActual();
     infoDestino.innerHTML = `<div style="background:var(--bajo-bg);border:1px solid #F0D9B5;border-radius:var(--radio-input);padding:10px 14px;font-size:0.82rem;color:var(--bajo-txt);">↓ Se descuenta de <strong>${origen}</strong> (sector de despacho). No suma a ningún otro lado.</div>`;
     return;
   }
@@ -1100,9 +1107,10 @@ document.getElementById("btn-confirmar-salida").addEventListener("click", async 
   const prod     = productos.find(p => p.id === prodId);
   if (!prod || cantidad <= 0) { mostrarMsg(msgEl,"error","Completá los campos."); return; }
 
-  const origen = origenRetiroActual();
+  const motivoObj = motivosSalida.find(m => m.nombre === motivo);
+  const origen = resolverOrigenRetiro(prod, motivoObj, PERMITE_ELEGIR_ACOPIO);
 
-  // ── Retiro desde un sector de despacho ──
+  // ── Retiro desde un sector de despacho (descarte, o acopio sin stock) ──
   if (origen !== "acopio") {
     const stockSector = prod.stock_despacho?.[origen] ?? 0;
     if (cantidad > stockSector) { mostrarMsg(msgEl,"error",`Stock insuficiente en ${origen}. Hay ${stockSector} ${prod.unidad_medida}.`); return; }
