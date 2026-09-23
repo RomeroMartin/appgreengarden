@@ -130,3 +130,44 @@ test("vencimiento con stock en varios sectores: hay que elegir sector, pero SIN 
   assert.equal(p.stock_despacho.Salon, salonAntes - 1);
   assert.equal(p.stock_deposito, acopioAntes, "el acopio no se toca");
 });
+
+test("rotura: se comporta igual que Vencimiento (descuenta del sector de despacho)", async () => {
+  setSelect("sal-producto", "p-pan");
+  setSelect("sal-motivo", "3 - Rotura");
+  assert.equal(byId("sal-grupo-origen").style.display, "none", "un solo sector con stock: queda forzado, sin selector");
+  setValue("sal-cantidad", "1");
+  const acopioAntes = store.get("productos", "p-pan").stock_deposito;
+  const barraAntes  = store.get("productos", "p-pan").stock_despacho.Barra;
+  await click("btn-confirmar-salida");
+  const p = store.get("productos", "p-pan");
+  assert.equal(p.stock_deposito, acopioAntes, "el acopio no se toca");
+  assert.equal(p.stock_despacho.Barra, barraAntes - 1);
+  assert.match(store.dump("movimientos").at(-1).motivo, /Rotura/);
+});
+
+test("merma/desperdicio: se comporta igual que Vencimiento (descuenta del sector de despacho)", async () => {
+  setSelect("sal-producto", "p-pan");
+  setSelect("sal-motivo", "4 - Merma / Desperdicio");
+  assert.equal(byId("sal-grupo-origen").style.display, "none");
+  setValue("sal-cantidad", "1");
+  const acopioAntes = store.get("productos", "p-pan").stock_deposito;
+  const barraAntes  = store.get("productos", "p-pan").stock_despacho.Barra;
+  await click("btn-confirmar-salida");
+  const p = store.get("productos", "p-pan");
+  assert.equal(p.stock_deposito, acopioAntes, "el acopio no se toca");
+  assert.equal(p.stock_despacho.Barra, barraAntes - 1);
+  assert.match(store.dump("movimientos").at(-1).motivo, /Merma/);
+});
+
+test("retiro para uso: NO es un motivo de descarte, sigue descontando del acopio por defecto", async () => {
+  setSelect("sal-producto", "p-pan");
+  setSelect("sal-motivo", "5 - Retiro para uso");
+  assert.equal(byId("sal-grupo-origen").style.display, "none", "acopio sano: no aparece selector");
+  setValue("sal-cantidad", "1");
+  const acopioAntes = store.get("productos", "p-pan").stock_deposito;
+  const barraAntes  = store.get("productos", "p-pan").stock_despacho.Barra;
+  await click("btn-confirmar-salida");
+  const p = store.get("productos", "p-pan");
+  assert.equal(p.stock_deposito, acopioAntes - 1, "descuenta del acopio, como antes");
+  assert.equal(p.stock_despacho.Barra, barraAntes, "el despacho no se toca");
+});

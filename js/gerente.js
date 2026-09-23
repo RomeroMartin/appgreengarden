@@ -39,8 +39,9 @@ let lotesCache        = [];   // lotes de importación (cargas masivas de ventas
 let usuarioActual     = null;
 let confirmCallback   = null;
 
-// Gerente: en un retiro por Vencimiento el origen por defecto es el sector
-// de despacho, pero siempre puede optar por descontarlo del acopio.
+// Gerente: en un retiro por descarte (Vencimiento/Rotura/Merma) el origen
+// por defecto es el sector de despacho, pero siempre puede optar por
+// descontarlo del acopio.
 const PERMITE_ELEGIR_ACOPIO = true;
 
 // Estado del editor de recetas
@@ -1014,7 +1015,7 @@ function actualizarInfoRetiro() {
     return;
   }
 
-  // ── Selector de origen inteligente (Vencimiento → despacho por defecto,
+  // ── Selector de origen inteligente (descarte → despacho por defecto,
   // con opción de elegir acopio; otros motivos → Acopio/despacho solo si el
   // acopio está bajo/cero) ──
   const motivoObj = motivosSalida.find(m => m.nombre === document.getElementById("sal-motivo").value);
@@ -1109,7 +1110,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click", async 
   const motivoObj = motivosSalida.find(m => m.nombre === motivo);
   const origen = resolverOrigenRetiro(prod, motivoObj, PERMITE_ELEGIR_ACOPIO);
 
-  // ── Retiro desde un sector de despacho (Vencimiento, o acopio sin stock) ──
+  // ── Retiro desde un sector de despacho (descarte, o acopio sin stock) ──
   if (origen !== "acopio") {
     const stockSector = prod.stock_despacho?.[origen] ?? 0;
     if (cantidad > stockSector) { mostrarMsg(msgEl,"error",`Stock insuficiente en ${origen}. Hay ${stockSector} ${prod.unidad_medida}.`); return; }

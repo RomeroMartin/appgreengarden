@@ -24,9 +24,10 @@ let usuarioActual = null;
 
 let motivosSalida = [...MOTIVOS_SALIDA_DEFAULT];
 
-// Cargador de Salidas (operador de base): en un retiro por Vencimiento el
-// origen queda forzado al sector de despacho, sin la opción de elegir acopio
-// (esa opción es exclusiva de Gerente/Encargado/Administrador).
+// Cargador de Salidas (operador de base): en un retiro por descarte
+// (Vencimiento/Rotura/Merma) el origen queda forzado al sector de despacho,
+// sin la opción de elegir acopio (esa opción es exclusiva de
+// Gerente/Encargado/Administrador).
 const PERMITE_ELEGIR_ACOPIO = false;
 
 
@@ -105,7 +106,7 @@ function actualizarInfo() {
 
   const motivoObj = motivosSalida.find(m => m.nombre === document.getElementById("sal-motivo").value);
 
-  // ── Selector de origen inteligente (Vencimiento → despacho por defecto;
+  // ── Selector de origen inteligente (descarte → despacho por defecto;
   // otros motivos → Acopio/despacho solo si el acopio está sin stock) ──
   let origenEsDespacho = false;
   let origenForzado = null;
@@ -179,7 +180,7 @@ document.getElementById("btn-confirmar-salida").addEventListener("click", async 
   const motivoObj = motivosSalida.find(m => m.nombre === motivo);
   const origen = resolverOrigenRetiro(prod, motivoObj, PERMITE_ELEGIR_ACOPIO);
 
-  // ── Retiro desde un sector de despacho (Vencimiento, o acopio sin stock) ──
+  // ── Retiro desde un sector de despacho (descarte, o acopio sin stock) ──
   if (origen !== "acopio") {
     const stockSector = prod.stock_despacho?.[origen] ?? 0;
     if (cantidad > stockSector) { mostrarMsg(msgEl,"error",`Stock insuficiente en ${origen}. Hay ${fmtN(stockSector)} ${prod.unidad_medida}.`); return; }

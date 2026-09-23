@@ -57,12 +57,14 @@ export function origenRetiroActual() {
   return "acopio";
 }
 
-// ¿El motivo elegido es "Vencimiento"? Se detecta por nombre (no por
-// "transfiere", que ya es false para Vencimiento igual que para Rotura/Merma)
-// porque el nombre lo define el Gerente vía Firestore con un prefijo numérico
-// variable ("2 - Vencimiento", pero podría reordenarse).
-export function esMotivoVencimiento(motivoObj) {
-  return !!motivoObj && /venc/i.test(String(motivoObj.nombre ?? ""));
+// ¿El motivo elegido es un "descarte" (Vencimiento, Rotura o Merma/Desperdicio)?
+// Se detecta por nombre (no por "transfiere", que ya es false para estos tres
+// igual que para "Retiro para uso") porque el nombre lo define el Gerente vía
+// Firestore con un prefijo numérico variable ("2 - Vencimiento", "3 - Rotura",
+// pero podrían reordenarse). "Retiro para uso" queda afuera a propósito: ese
+// consumo sí suele salir del acopio, no de la mercadería ya puesta en despacho.
+export function esMotivoDescarte(motivoObj) {
+  return !!motivoObj && /venc|rotura|merma|desperdici/i.test(String(motivoObj.nombre ?? ""));
 }
 
 // Sectores de despacho con stock > 0 para un producto, como [nombre, cantidad].
@@ -72,13 +74,14 @@ export function sectoresConStock(p) {
 
 // Decide el comportamiento del selector "¿De dónde retirás?" para un retiro.
 //
-// - Vencimiento (y el producto tiene stock en algún sector de despacho): por
-//   defecto se descuenta de DESPACHO, no de acopio —el producto vencido está
-//   físicamente en el sector, no en el depósito—. Si hay más de un sector con
-//   stock, hace falta elegir cuál (para eso siempre se muestra el selector).
-//   Si `permiteElegirAcopio` es true (Gerente/Encargado/Administrador), el
-//   selector también ofrece "Acopio" como alternativa; si es false (Cargador
-//   de Salidas), el origen queda forzado al sector sin mostrar selector.
+// - Descarte (Vencimiento/Rotura/Merma, y el producto tiene stock en algún
+//   sector de despacho): por defecto se descuenta de DESPACHO, no de acopio
+//   —el producto descartado está físicamente en el sector, no en el
+//   depósito—. Si hay más de un sector con stock, hace falta elegir cuál
+//   (para eso siempre se muestra el selector). Si `permiteElegirAcopio` es
+//   true (Gerente/Encargado/Administrador), el selector también ofrece
+//   "Acopio" como alternativa; si es false (Cargador de Salidas), el origen
+//   queda forzado al sector sin mostrar selector.
 // - Cualquier otro motivo: se mantiene el "retiro inteligente" ya existente
 //   (selector Acopio + sectores solo cuando el acopio está en cero/bajo mínimo).
 //
@@ -87,7 +90,7 @@ export function sectoresConStock(p) {
 export function calcularOrigenRetiro(prod, motivoObj, permiteElegirAcopio) {
   const despConStock = sectoresConStock(prod);
 
-  if (esMotivoVencimiento(motivoObj) && despConStock.length > 0) {
+  if (esMotivoDescarte(motivoObj) && despConStock.length > 0) {
     const ordenado = [...despConStock].sort((a, b) => (b[1] || 0) - (a[1] || 0));
     const origenDefault = ordenado[0][0];
     const opcDespacho = ordenado.map(([s, v]) => ({ value: s, label: `${s} (${fmtN(v)} ${prod.unidad_medida ?? ""})` }));
@@ -114,7 +117,7 @@ export function calcularOrigenRetiro(prod, motivoObj, permiteElegirAcopio) {
 
 // Origen real que va a usar el retiro: si el selector está visible, lo que haya
 // elegido el usuario en el <select>; si no, el default calculado (que puede ser
-// un sector de despacho cuando el retiro por Vencimiento queda forzado).
+// un sector de despacho cuando el retiro por descarte queda forzado).
 export function resolverOrigenRetiro(prod, motivoObj, permiteElegirAcopio) {
   const info = calcularOrigenRetiro(prod, motivoObj, permiteElegirAcopio);
   if (!info.mostrar) return info.origenDefault;
