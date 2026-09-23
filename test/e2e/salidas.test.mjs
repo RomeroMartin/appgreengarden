@@ -12,6 +12,11 @@ before(async () => {
         { id: "p-vino", nombre: "Vino", plu: "150", rubro: "Bebidas", sector: "Barra",
           unidad_medida: "Unidad", tipo: "Despacho", sectores_asignados: ["Barra"],
           stock_deposito: 0, stock_despacho: { Barra: 5 } },
+        // acopio SANO (bien arriba del mínimo) con stock en un solo sector de
+        // despacho → para probar que Vencimiento igual descuenta de despacho.
+        { id: "p-pan", nombre: "Pan", plu: "170", rubro: "Bebidas", sector: "Barra",
+          unidad_medida: "Unidad", tipo: "Despacho", sectores_asignados: ["Barra"],
+          stock_deposito: 50, stock_minimo: 5, stock_despacho: { Barra: 8 } },
       ],
     },
   });
@@ -90,4 +95,38 @@ test("rechaza retiro por stock insuficiente en acopio", async () => {
   assert.equal(store.get("productos", "p-limon").stock_deposito, antes, "no cambia el stock");
   assert.equal(store.count("movimientos"), movs, "no registra movimiento");
   assert.match(text("msg-salida"), /insuficiente/i);
+});
+
+test("vencimiento con un solo sector de despacho: se descuenta de ahí por defecto (acopio sano, sin selector)", async () => {
+  setSelect("sal-producto", "p-pan");
+  setSelect("sal-motivo", "2 - Vencimiento");
+  assert.equal(byId("sal-grupo-origen").style.display, "none", "no hace falta elegir: queda forzado al sector");
+  assert.match(text("sal-info-destino"), /Barra/);
+  setValue("sal-cantidad", "3");
+  const acopioAntes = store.get("productos", "p-pan").stock_deposito;
+  const barraAntes  = store.get("productos", "p-pan").stock_despacho.Barra;
+  await click("btn-confirmar-salida");
+  const p = store.get("productos", "p-pan");
+  assert.equal(p.stock_deposito, acopioAntes, "el acopio (sano) NO se toca");
+  assert.equal(p.stock_despacho.Barra, barraAntes - 3, "se descontó del sector de despacho");
+  const mov = store.dump("movimientos").at(-1);
+  assert.equal(mov.origen, "Barra");
+  assert.equal(mov.destino, "consumo");
+  assert.match(mov.motivo, /Vencimiento/);
+});
+
+test("vencimiento con stock en varios sectores: hay que elegir sector, pero SIN opción de acopio (Cargador de Salidas)", async () => {
+  setSelect("sal-producto", "p-cerveza");
+  setSelect("sal-motivo", "2 - Vencimiento");
+  assert.notEqual(byId("sal-grupo-origen").style.display, "none", "aparece selector para elegir el sector");
+  const opciones = [...byId("sal-origen").options].map(o => o.value);
+  assert.ok(!opciones.includes("acopio"), "el Cargador de Salidas NO puede elegir acopio para Vencimiento");
+  setSelect("sal-origen", "Salon");
+  setValue("sal-cantidad", "1");
+  const salonAntes  = store.get("productos", "p-cerveza").stock_despacho.Salon;
+  const acopioAntes = store.get("productos", "p-cerveza").stock_deposito;
+  await click("btn-confirmar-salida");
+  const p = store.get("productos", "p-cerveza");
+  assert.equal(p.stock_despacho.Salon, salonAntes - 1);
+  assert.equal(p.stock_deposito, acopioAntes, "el acopio no se toca");
 });

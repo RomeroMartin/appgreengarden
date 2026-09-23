@@ -187,13 +187,14 @@ Suma al **acopio**. Dos tipos:
 - `INGRESO_PRODUCCION`: algo elaborado en el restaurante que entra al stock.
 
 ### 7.2 Retiro (`salidas.js`, `encargado.js`, `gerente.js`, `administrador.js`)
-Saca del acopio. El efecto depende del **motivo**:
+Saca del acopio o de un sector de despacho, según el **motivo** y el origen elegido/calculado:
 - **Reposición** (motivo con `transfiere: true`): ÚNICO que transfiere. Resta del acopio Y suma en el sector de despacho. Atómico con `writeBatch`.
-- **Retiro para uso / Merma / Vencimiento / Rotura** (`transfiere: false`): solo restan del acopio.
+- **Retiro para uso / Merma / Rotura** (`transfiere: false`, no es Vencimiento): solo restan del acopio (salvo que se dispare el retiro inteligente por acopio bajo, ver debajo).
+- **Vencimiento** (`transfiere: false`, detectado por nombre — ver `esMotivoVencimiento`): por defecto resta de un **sector de despacho** (el producto vencido está físicamente ahí, no en el depósito), no del acopio. Si el producto tiene stock en más de un sector, hay que elegir cuál. Gerente/Encargado/Administrador siempre ven además la opción "Acopio" en el selector; el Cargador de Salidas (operador de base) queda fijo en despacho, sin esa opción. Si el producto no tiene stock en ningún sector de despacho (p.ej. materia prima), cae al comportamiento normal de acopio.
 - Para materias primas, Reposición no se ofrece (no van a despacho).
 
-**Retiro inteligente (v3.5, ahora en TODOS los roles que retiran):** cuando el acopio está en cero o bajo el mínimo PERO hay stock en algún sector de despacho, aparece un selector **"¿De dónde retirás?"** (Acopio + sectores con stock). Si se elige un sector, el movimiento queda con `origen = sector`, `destino = "consumo"`, y descuenta de ese despacho. En ese caso NO se ofrece Reposición (no se repone de despacho a despacho).
-- Helper `acopioBajoOcero(p)`, `origenRetiroActual()`. Disponible en gerente, admin, encargado y cargador de salidas.
+**Retiro inteligente (v3.5, ahora en TODOS los roles que retiran):** cuando el acopio está en cero o bajo el mínimo PERO hay stock en algún sector de despacho, aparece un selector **"¿De dónde retirás?"** (Acopio + sectores con stock) — esto aplica a motivos que no sean Vencimiento. Si se elige un sector, el movimiento queda con `origen = sector`, `destino = "consumo"`, y descuenta de ese despacho. En ese caso NO se ofrece Reposición (no se repone de despacho a despacho).
+- Helpers en `core-inventario.js`: `acopioBajoOcero(p)`, `esMotivoVencimiento(motivoObj)`, `sectoresConStock(p)`, `calcularOrigenRetiro(prod, motivoObj, permiteElegirAcopio)` (decide selector/opciones/default), `resolverOrigenRetiro(...)` (el origen real a usar al confirmar), `origenRetiroActual()` (lee el `<select>` visible). `permiteElegirAcopio` es `true` en gerente/encargado/administrador y `false` en el Cargador de Salidas.
 
 ### 7.3 Venta (solo Gerente y Admin)
 Descuenta del **despacho**. Dos vías:
