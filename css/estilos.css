@@ -500,7 +500,7 @@ select.form-control {
 }
 
 /* ── Layout ancho (opt-in: paneles de escritorio) ─────────── */
-.app-wrapper--ancho { max-width: 1120px; }
+.app-wrapper--ancho { max-width: 960px; }
 
 /* Pestañas de navegación: una sola fila, con scroll horizontal en celular */
 .tabs-nav { flex-wrap: nowrap; }
@@ -524,9 +524,6 @@ select.form-control {
   .app-wrapper--ancho .stock-filtros { gap: 12px; }
 }
 
-@media (min-width: 1100px) {
-  .app-wrapper--ancho { padding: 0 40px; }
-}
 
 /* ── Logos de marca (SVG) ─────────────────────────────────── */
 .app-logo-img { height: 28px; width: auto; display: block; }

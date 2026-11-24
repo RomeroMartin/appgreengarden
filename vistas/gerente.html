@@ -19,6 +19,14 @@
     .modal-overlay.open { opacity:1; pointer-events:all; }
     .modal { background:var(--bg-card); border:1px solid var(--borde); border-radius:var(--radio) var(--radio) 0 0; box-shadow:0 -4px 32px rgba(0,0,0,0.08); padding:24px 20px; width:100%; max-width:480px; margin:0 auto; transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1); max-height:92dvh; overflow-y:auto; }
     .modal-overlay.open .modal { transform:translateY(0); }
+    /* Stock en escritorio: tarjetas en 2 columnas para leer todo de un vistazo */
+    @media (min-width:768px) {
+      #tab-stock > .card { background:transparent; border:none; box-shadow:none; padding:0; }
+      #lista-stock { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
+      #lista-stock .item-row { background:var(--bg-card); border:1px solid var(--borde); border-radius:var(--radio); padding:14px 16px; box-shadow:var(--sombra-card); }
+      #lista-stock .item-row:last-child { border-bottom:1px solid var(--borde); }
+      #lista-stock .empty-state { grid-column:1 / -1; }
+    }
     @media (min-width:768px) {
       .modal-overlay { align-items:center; justify-content:center; padding:24px; }
       .modal { border-radius:var(--radio); transform:translateY(16px) scale(0.98); margin:0; box-shadow:var(--sombra-lg); }
