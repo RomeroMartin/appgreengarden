@@ -498,3 +498,37 @@ select.form-control {
   font-family: monospace;
   letter-spacing: 0.5px;
 }
+
+/* ── Layout ancho (opt-in: paneles de escritorio) ─────────── */
+.app-wrapper--ancho { max-width: 1120px; }
+
+/* Pestañas de navegación: una sola fila, con scroll horizontal en celular */
+.tabs-nav { flex-wrap: nowrap; }
+.tabs-nav .tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+}
+.tabs-nav .tab-btn .ico { margin: 0 !important; vertical-align: 0 !important; flex-shrink: 0; }
+
+@media (min-width: 768px) {
+  .app-wrapper--ancho { padding: 0 32px; }
+  .app-wrapper--ancho .app-header { padding: 18px 0 16px; margin-bottom: 24px; }
+  .app-wrapper--ancho .tabs { padding: 5px; margin-bottom: 24px; }
+  .app-wrapper--ancho .tab-btn { font-size: 0.85rem; padding: 10px 16px; }
+  .app-wrapper--ancho .card { padding: 24px; }
+  .app-wrapper--ancho .btn { width: auto; }
+  .app-wrapper--ancho .btn.btn-block { width: 100%; }
+  .app-wrapper--ancho .stock-filtros { gap: 12px; }
+}
+
+@media (min-width: 1100px) {
+  .app-wrapper--ancho { padding: 0 40px; }
+}
+
+/* ── Logos de marca (SVG) ─────────────────────────────────── */
+.app-logo-img { height: 28px; width: auto; display: block; }
+.logo-loading-img { width: 220px; max-width: 70vw; height: auto; display: block; }
+.login-logo-img { display: block; width: 78%; max-width: 280px; height: auto; margin: 0 auto 10px; }
