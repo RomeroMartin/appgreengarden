@@ -101,9 +101,9 @@ export function renderResumen(contenedorId, productos) {
 
   const hayAtraso = r.atrasados > 0;
   cont.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;background:${hayAtraso ? 'var(--bajo-bg)' : 'var(--verde-claro)'};border:1px solid ${hayAtraso ? '#F0D9B5' : 'var(--verde-suave)'};border-radius:var(--radio-input);padding:10px 14px;">
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;text-align:center;background:${hayAtraso ? 'var(--bajo-bg)' : 'var(--verde-claro)'};border:1px solid ${hayAtraso ? '#F0D9B5' : 'var(--verde-suave)'};border-radius:var(--radio-input);padding:10px 14px;">
       <span style="display:inline-flex;color:${hayAtraso ? 'var(--bajo-txt)' : 'var(--verde)'};">${hayAtraso ? icono("alerta",{size:19}) : icono("corte",{size:19})}</span>
-      <div style="flex:1;">
+      <div>
         <div style="font-size:0.68rem;color:var(--texto-3);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Ventas cargadas</div>
         <div style="font-size:0.9rem;font-weight:700;color:var(--texto);">Más reciente: ${recienteStr}</div>
         <div style="font-size:0.78rem;margin-top:2px;">${detalle}${sinCargar}</div>

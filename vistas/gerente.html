@@ -82,7 +82,7 @@
   <div class="app-wrapper app-wrapper--ancho" id="contenido" style="display:none;">
 
     <header class="app-header">
-      <div class="app-logo"><img class="app-logo-img" src="../img/hoja-gg.svg" alt="" />Green Garden</div>
+      <div class="app-logo"><img class="app-logo-img" src="../img/hoja-gg.svg" alt="" /><img class="app-logo-texto" src="../img/texto-gg.svg" alt="Green Garden" /></div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span class="app-rol-badge">Gerente</span>
         <button class="btn-logout" id="btn-logout">Salir</button>
@@ -103,10 +103,10 @@
     <div class="tab-content active" id="tab-stock">
       <div id="indicador-corte" style="margin-bottom:14px;"></div>
       <div id="seccion-alertas" style="display:none;margin-bottom:14px;">
-        <div style="background:var(--critico-bg);border:1px solid #F5C6C5;border-radius:var(--radio);padding:14px 16px;">
-          <div id="alertas-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;">
+        <div style="background:var(--critico-bg);border:1px solid #F5C6C5;border-radius:var(--radio-input);padding:8px 14px;">
+          <div id="alertas-header" style="display:flex;justify-content:center;align-items:center;gap:10px;cursor:pointer;user-select:none;">
             <p style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--critico-txt);margin:0;"><svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.15em;margin-right:5px"><path d="M10.6 4 3 17.5a1.6 1.6 0 0 0 1.4 2.4h15.2a1.6 1.6 0 0 0 1.4-2.4L13.4 4a1.6 1.6 0 0 0-2.8 0Z"/><path d="M12 9.5v4"/><path d="M12 17h.01"/></svg>Productos bajo mínimo <span id="alertas-count"></span></p>
-            <span id="alertas-chevron" style="color:var(--critico-txt);font-size:0.8rem;transition:transform .2s;">▼</span>
+            <span id="alertas-chevron" style="color:var(--critico-txt);font-size:0.7rem;transition:transform .2s;">▼</span>
           </div>
           <div id="lista-alertas" style="margin-top:10px;display:none;"></div>
         </div>
